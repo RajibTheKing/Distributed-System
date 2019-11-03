@@ -182,24 +182,33 @@ class Server(Bottle):
         option = request.forms.get('delete')
         modified_entry = request.forms.get('entry')
         print(option)
-        if option == "1":
-            print("deleting content id {0}",number)
-            self.blackboard.delete_content(number)
-            self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
-                {
-                    "value": option, 
-                    "number": number
-                }))
-            
+        leader_server = self.get_leader_server()
+        if leader_server == self.ip:
+            if option == "1":
+                print("deleting content id {0}",number)
+                self.blackboard.delete_content(number)
+                self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
+                    {
+                        "value": option, 
+                        "number": number
+                    }))
+                
+            else:
+                print("modifying content id {0}",number)
+                self.blackboard.set_content(number,modified_entry)
+                self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
+                    {
+                        "value": option, 
+                        "number": number,
+                        "entry": modified_entry
+                    }))
         else:
-            print("modifying content id {0}",number)
-            self.blackboard.set_content(number,modified_entry)
-            self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
-                {
-                    "value": option, 
-                    "number": number,
-                    "entry": modified_entry
-                }))
+            payload = {
+                'delete': option,
+                'entry': modified_entry,
+            }
+            self.contact_another_server(leader_server, URI='/board/{0}/'.format(number), req="POST", dataToSend=payload)
+
 
         redirect('/')
 
