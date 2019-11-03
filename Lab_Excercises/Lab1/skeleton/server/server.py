@@ -8,7 +8,7 @@ from threading import Lock, Thread
 import time
 import traceback
 import bottle
-from bottle import Bottle, request, template, run, static_file
+from bottle import Bottle, request, template, run, static_file, redirect
 import requests
 # ------------------------------------------------------------------------------------------------------
 
@@ -150,13 +150,29 @@ class Server(Bottle):
                         board_title='Server {} ({})'.format(self.id,
                                                             self.ip),
                         board_dict=board.iteritems())
-    # post on ('/board')
+
+    # post on ('/board') add new entry
     def post_board(self):
+        print(dir(request))
+        print(request.forms)
+        print(list(request.forms))
         newEntry = request.forms.get('entry')
-        print(newEntry)
-        self.blackboard.add_content(newEntry)
-        #def propagate_to_all_servers(self, URI, req='POST', params_dict=None):
-        self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps({"entry": newEntry}))
+        leader_server = self.get_leader_server()
+        if self.ip == leader_server:
+            print(newEntry)
+            self.blackboard.add_content(newEntry)
+            #def propagate_to_all_servers(self, URI, req='POST', params_dict=None):
+            self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps({"entry": newEntry}))
+        else:
+            payload = {
+                'entry': newEntry,
+            }
+            self.contact_another_server(leader_server, URI='/board', req="POST", dataToSend=payload)
+            redirect('/')
+
+        
+
+        
 
     # post on ('/board/<number>)
     def post_board_ID(self, number):
@@ -185,7 +201,7 @@ class Server(Bottle):
                     "entry": modified_entry
                 }))
 
-        return self.get_board()
+        redirect('/')
 
 
     # post on ('/propagate')
@@ -230,6 +246,13 @@ class Server(Bottle):
 
     def get_template(self, filename):
         return static_file(filename, root='./server/templates/')
+
+    
+    # Getting the leader server
+    def get_leader_server(self):
+        leader = min(self.servers_list)
+        return leader
+
         
 
 # ------------------------------------------------------------------------------------------------------
