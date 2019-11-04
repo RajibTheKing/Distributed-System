@@ -55,45 +55,39 @@ class Blackboard():
 
     def __init__(self):
         currentTimeStamp = time.time()
-        self.content = [{"id": 1, "entry": "First", "createdAt": currentTimeStamp}]
+        self.content = dict()
+        self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
+        self.lastWrittenID = 1
         self.lock = Lock() # use lock when you modify the content
 
 
 
-    def get_content(self):
+    def get_content(self): #O(1)
         with self.lock:
             cnt = self.content
         return cnt
 
-    def propagateContent(self, parsedItem):
+    def propagateContent(self, parsedItem): #O(1) Expected
         with self.lock:
-            self.content.append(parsedItem)
+            self.content[parsedItem['id']] = {"entry": parsedItem['entry'], "createdAt": parsedItem['createdAt']}
 
-    def add_content(self, new_content):
+    def add_content(self, new_content): #O(1) Expected
         with self.lock:
             currentTimeStamp = time.time()
-
-            l = len(self.content)
-            if l == 0:
-                lastID = 0
-            else:
-                lastID = self.content[l-1]["id"]
-            
-            newValue  =  {"id": lastID+1, "entry": new_content, "createdAt": currentTimeStamp}
-            self.content.append(newValue)
+            nowID = self.lastWrittenID + 1
+            newValue  =  {"id": nowID, "entry": new_content, "createdAt": currentTimeStamp}
+            self.content[nowID] = {"entry": new_content, "createdAt": currentTimeStamp}
+            self.lastWrittenID = nowID
             return newValue
 
-    def set_content(self,number, modified_entry):
+    def set_content(self,number, modified_entry): # O(1) Expected
         with self.lock:
-            self.content = list(map(lambda x: {"id": number, "entry": modified_entry, "createdAt": x['createdAt']} 
-                                                      if x['id'] == number 
-                                               else x ,
-                                              self.content))
-            
+            prevValue = self.content[number]
+            self.content[number] = {"entry" : modified_entry, "createdAt": prevValue["createdAt"]}
     
-    def delete_content(self, number):
+    def delete_content(self, number): # O(1) Expected
         with self.lock:
-            self.content = list(filter(lambda x: x['id']!=number,self.content))
+            self.content.pop(number)
 
 
 # ------------------------------------ ------------------------------------------------------------------
@@ -186,8 +180,10 @@ class Server(Bottle):
         # we must transform the blackboard as a dict for compatiobility reasons
         boardData = self.blackboard.get_content()
         board = dict()
-        for x in boardData :
-           board[x["id"]] = x["entry"]
+        for i in boardData:
+            x = boardData[i]
+            board[i] = x["entry"]
+        
         return template('server/templates/index.tpl',
                         board_title='Server {} ({})'.format(self.id,
                                                             self.ip),
@@ -197,11 +193,11 @@ class Server(Bottle):
     # get on ('/board')
     def get_board(self):
         # we must transform the blackboard as a dict for compatibility reasons
-        
         boardData = self.blackboard.get_content()
         board = dict()
-        for x in boardData :
-           board[x["id"]] = x["entry"]
+        for i in boardData:
+            x = boardData[i]
+            board[i] = x["entry"]
         return template('server/templates/blackboard.tpl',
                         board_title='Server {} ({})'.format(self.id,
                                                             self.ip),
