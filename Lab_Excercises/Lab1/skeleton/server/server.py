@@ -10,13 +10,53 @@ import traceback
 import bottle
 from bottle import Bottle, request, template, run, static_file, redirect
 import requests
+import Queue
+import time
 # ------------------------------------------------------------------------------------------------------
+class Logger:
+    
+    def __init__(self, serverIP):
+        self.fileName = serverIP+".txt"
+        self.filePtr = open(self.fileName, "w+")
+        self.lock = Lock()
+        self.queue = Queue.Queue(100)
+        self.writeToFile("logging")
+        self.writeToFile("Testing")
+        thread = Thread(target=self.consume)
+        thread.start()
+
+    def writeToFile(self, text):
+        self.filePtr.write(text + "\n")
+        self.filePtr.flush()
+
+    
+    def addToQueue(self, text):
+        with self.lock:
+            print("Trying to add new value into queue--> " + text)
+            self.queue.put(text)
+
+    def consume(self):
+        while True:
+            with self.lock:
+                while not self.queue.empty():
+                    item = self.queue.get()
+                    print("Get value: " + item)
+                    self.writeToFile(item)
+            time.sleep(1)
+
+    
+
+    
+
+        
 
 class Blackboard():
 
     def __init__(self):
-        self.content = [{"id": 1, "entry": "First"}, {"id": 2, "entry": "Second"}]
+        currentTimeStamp = time.time()
+        self.content = [{"id": 1, "entry": "First", "createdAt": currentTimeStamp}]
         self.lock = Lock() # use lock when you modify the content
+
 
 
     def get_content(self):
@@ -24,19 +64,30 @@ class Blackboard():
             cnt = self.content
         return cnt
 
+    def propagateContent(self, parsedItem):
+        with self.lock:
+            self.content.append(parsedItem)
+
     def add_content(self, new_content):
         with self.lock:
+            currentTimeStamp = time.time()
+
             l = len(self.content)
             if l == 0:
                 lastID = 0
             else:
                 lastID = self.content[l-1]["id"]
             
-            self.content.append({"id": lastID+1, "entry": new_content})
+            newValue  =  {"id": lastID+1, "entry": new_content, "createdAt": currentTimeStamp}
+            self.content.append(newValue)
+            return newValue
 
     def set_content(self,number, modified_entry):
         with self.lock:
-            self.content = list(map(lambda x: {"id": number, "entry": modified_entry} if x['id'] == number else x ,self.content))
+            self.content = list(map(lambda x: {"id": number, "entry": modified_entry, "createdAt": x['createdAt']} 
+                                                      if x['id'] == number 
+                                               else x ,
+                                              self.content))
             
     
     def delete_content(self, number):
@@ -54,10 +105,13 @@ class Server(Bottle):
         self.ip = str(IP)
         self.servers_list = servers_list
         print(servers_list)
+        self.myLogger = Logger(self.ip)
+
         # list all REST URIs
         # if you add new URIs to the server, you need to add them here
         self.route('/', callback=self.index)
         self.get('/board', callback=self.get_board)
+        self.get('/serverlist', callback=self.get_serverlist)
         self.post('/', callback=self.post_index)
         self.post('/board', callback=self.post_board)
         self.post('/propagate', callback=self.post_propagate)
@@ -150,19 +204,25 @@ class Server(Bottle):
                         board_title='Server {} ({})'.format(self.id,
                                                             self.ip),
                         board_dict=board.iteritems())
+    # get on ('/serverlist')
+    def get_serverlist(self):
+        return json.dumps(self.servers_list)
+
 
     # post on ('/board') add new entry
     def post_board(self):
+
         print(dir(request))
         print(request.forms)
         print(list(request.forms))
         newEntry = request.forms.get('entry')
+        self.myLogger.addToQueue('post_board: ' + newEntry)
         leader_server = self.get_leader_server()
         if self.ip == leader_server:
             print(newEntry)
-            self.blackboard.add_content(newEntry)
+            addedItem = self.blackboard.add_content(newEntry)
             #def propagate_to_all_servers(self, URI, req='POST', params_dict=None):
-            self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps({"entry": newEntry}))
+            self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps(addedItem))
         else:
             payload = {
                 'entry': newEntry,
@@ -218,9 +278,8 @@ class Server(Bottle):
         print(list(request.body))
         data = list(request.body)
         print(json.loads(data[0]))
-        parsed = json.loads(data[0])
-
-        self.blackboard.add_content(parsed['entry'])
+        parsedItem = json.loads(data[0])
+        self.blackboard.propagateContent(parsedItem)
     
     # post on ('/propagate_deletemodify/)
     def post_propagate_deletemodify(self):
