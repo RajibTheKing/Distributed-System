@@ -67,7 +67,7 @@ class UnitTest:
             randText += chr(val)
         return randText
 
-
+    """scene 1 client connect to all servers and send 5 messages concurrently """
     def generate_Scenario1(self):
         for server in self.serverList:
             print("Check: " + server)
@@ -86,12 +86,29 @@ class UnitTest:
                 #res = self.sendRequest(server,URI,req,dataToSend)
                 print(newEntry)
             print("\n\n")
-
+    
+    
+    def generate_Scenario2(self):
+        self.generate_Scenario1()
+        # time.sleep(1)
+        for server in self.serverList:
+            print("Check: " + server)
+            
+            modifiedEntry = "modified_text_" + self.getRandomText()
+            URI = '/board/14/'
+            req = 'POST'
+            payload = {
+                'entry': modifiedEntry,
+            }
+            dataToSend = payload
+            self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
+            print("\n\n")
+        
 
 def main():
     test = UnitTest('10.1.0.2')
     test.get_servers_list()
-    test.generate_Scenario1()
+    test.generate_Scenario2()
 
 if __name__ == '__main__':
     main()
