@@ -12,6 +12,7 @@ from bottle import Bottle, request, template, run, static_file, redirect
 import requests
 import Queue
 import time
+import concurrent.futures
 # ------------------------------------------------------------------------------------------------------
 class Logger:
     
@@ -106,6 +107,7 @@ class Server(Bottle):
         self.servers_list = servers_list
         print(servers_list)
         self.myLogger = Logger(self.ip)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         # list all REST URIs
         # if you add new URIs to the server, you need to add them here
@@ -172,8 +174,8 @@ class Server(Bottle):
     def propagate_to_all_servers(self, URI, req='POST', dataToSend=None):
         for srv_ip in self.servers_list:
             if srv_ip != self.ip: # don't propagate to yourself
-                self.do_parallel_task(self.contact_another_server, args=(srv_ip, URI, req, dataToSend))
-
+                # self.do_parallel_task(self.contact_another_server, args=(srv_ip, URI, req, dataToSend))
+                self.executor.submit(self.contact_another_server, srv_ip, URI, req, dataToSend)
                 #success =  self.contact_another_server(srv_ip, URI, req, dataToSend)
                 #if not success:
                 #    print("[WARNING ]Could not contact server {}".format(srv_ip))
