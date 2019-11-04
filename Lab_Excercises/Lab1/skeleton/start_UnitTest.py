@@ -49,6 +49,7 @@ class UnitTest:
                 return res
 
             elif 'GET' in req:
+                print("sending get request")
                 res = requests.get('http://{}{}'.format(srv_ip, URI))
                 return res
             else:
@@ -104,6 +105,17 @@ class UnitTest:
             self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
             print("\n\n")
         
+        time.sleep(20)
+
+        # get value from server 4 and 7 
+        res4 = self.sendRequest(srv_ip='10.1.0.4',URI='/board/alldata',req='GET')
+        res7 = self.sendRequest(srv_ip='10.1.0.7',URI='/board/alldata',req='GET')
+        
+
+        if res4.content == res7.content:
+            print("got same response from server 4 and 7 ")
+        else:
+            print("MISMATCH FOUND!!!!")
 
 def main():
     test = UnitTest('10.1.0.2')

@@ -56,8 +56,8 @@ class Blackboard():
     def __init__(self):
         currentTimeStamp = time.time()
         self.content = dict()
-        self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
-        self.lastWrittenID = 1
+        # self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
+        self.lastWrittenID = 0
         self.lock = Lock() # use lock when you modify the content
 
 
@@ -107,6 +107,7 @@ class Server(Bottle):
         # if you add new URIs to the server, you need to add them here
         self.route('/', callback=self.index)
         self.get('/board', callback=self.get_board)
+        self.get('/board/alldata',callback=self.get_board_data)
         self.get('/serverlist', callback=self.get_serverlist)
         self.post('/', callback=self.post_index)
         self.post('/board', callback=self.post_board)
@@ -205,6 +206,10 @@ class Server(Bottle):
     # get on ('/serverlist')
     def get_serverlist(self):
         return json.dumps(self.servers_list)
+    
+    # get all message 
+    def get_board_data(self):
+        return self.blackboard.get_content()
 
 
     # post on ('/board') add new entry
