@@ -32,7 +32,6 @@ class Logger:
     
     def addToQueue(self, text):
         with self.lock:
-            print("Trying to add new value into queue--> " + text)
             datetime_object = datetime.datetime.now()
             self.queue.put({"text": text, "time": datetime_object})
 
@@ -101,7 +100,7 @@ class Server(Bottle):
         self.id = int(ID)
         self.ip = str(IP)
         self.servers_list = servers_list
-        print(servers_list)
+        # print(servers_list)
         self.myLogger = Logger(self.ip)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
@@ -111,6 +110,7 @@ class Server(Bottle):
         self.get('/board', callback=self.get_board)
         self.get('/board/alldata',callback=self.get_board_data)
         self.get('/serverlist', callback=self.get_serverlist)
+        
         self.post('/', callback=self.post_index)
         self.post('/board', callback=self.post_board)
         self.post('/propagate', callback=self.post_propagate)
@@ -155,12 +155,8 @@ class Server(Bottle):
             if 'POST' in req:
                 f = requests.Session()
                 res = requests.post('http://{}{}'.format(srv_ip, URI), data=dataToSend )
-                #res = requests.post('http://{}{}'.format(srv_ip, URI), data=json.dumps({"entry": newValue}))
-                print(res)
-
             elif 'GET' in req:
                 res = requests.get('http://{}{}'.format(srv_ip, URI))
-            # result can be accessed res.json()
             if res.status_code == 200:
                 success = True
         except Exception as e:
@@ -216,17 +212,11 @@ class Server(Bottle):
 
     # post on ('/board') add new entry
     def post_board(self):
-
-        print(dir(request))
-        print(request.forms)
-        print(list(request.forms))
         newEntry = request.forms.get('entry')
         self.myLogger.addToQueue('post_board: ' + newEntry)
         leader_server = self.get_leader_server()
         if self.ip == leader_server:
-            print(newEntry)
             addedItem = self.blackboard.add_content(newEntry)
-            #def propagate_to_all_servers(self, URI, req='POST', params_dict=None):
             self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps(addedItem))
         else:
             payload = {
@@ -241,9 +231,6 @@ class Server(Bottle):
 
     # post on ('/board/<number>)
     def post_board_ID(self, number):
-        print(request)
-        print("I am inside /board/<number>")
-        print(number)
         option = request.forms.get('delete')
         modified_entry = request.forms.get('entry')
 
@@ -255,7 +242,6 @@ class Server(Bottle):
         leader_server = self.get_leader_server()
         if leader_server == self.ip:
             if option == "1":
-                print("deleting content id {0}",number)
                 self.blackboard.delete_content(number)
                 self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
                     {
@@ -264,7 +250,6 @@ class Server(Bottle):
                     }))
                 
             else:
-                print("modifying content id {0}",number)
                 self.blackboard.set_content(number,modified_entry)
                 self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
                     {
@@ -285,27 +270,21 @@ class Server(Bottle):
 
     # post on ('/propagate')
     def post_propagate(self):
-        print(list(request.body))
         data = list(request.body)
-        print(json.loads(data[0]))
         parsedItem = json.loads(data[0])
         self.blackboard.propagateContent(parsedItem)
     
     # post on ('/propagate_deletemodify/)
     def post_propagate_deletemodify(self):
-        print(list(request.body))
         data = list(request.body)
-        print(json.loads(data[0]))
         parsed = json.loads(data[0])
         option = parsed['value']
         if option == "1":
             number = parsed['number']
-            print("deleting content id {0}",number)
             self.blackboard.delete_content(number)
         else:
             number = parsed['number']
             modified_entry = parsed['entry']
-            print("modifying content id {0}",number)
             self.blackboard.set_content(number,modified_entry)
 
 
@@ -317,7 +296,6 @@ class Server(Bottle):
         try:
             # we read the POST form, and check for an element called 'entry'
             new_entry = request.forms.get('entry')
-            print("Received: {}".format(new_entry))
         except Exception as e:
             print("[ERROR] "+str(e))
 
