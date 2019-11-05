@@ -13,6 +13,7 @@ import requests
 import Queue
 import time
 import concurrent.futures
+import datetime
 # ------------------------------------------------------------------------------------------------------
 class Logger:
     
@@ -21,27 +22,25 @@ class Logger:
         self.filePtr = open(self.fileName, "w+")
         self.lock = Lock()
         self.queue = Queue.Queue(100)
-        self.writeToFile("logging")
-        self.writeToFile("Testing")
         thread = Thread(target=self.consume)
         thread.start()
 
-    def writeToFile(self, text):
-        self.filePtr.write(text + "\n")
+    def writeToFile(self, item):
+        self.filePtr.write(str(item["time"]) + ": " + item["text"] + "\n")
         self.filePtr.flush()
 
     
     def addToQueue(self, text):
         with self.lock:
             print("Trying to add new value into queue--> " + text)
-            self.queue.put(text)
+            datetime_object = datetime.datetime.now()
+            self.queue.put({"text": text, "time": datetime_object})
 
     def consume(self):
         while True:
             with self.lock:
                 while not self.queue.empty():
                     item = self.queue.get()
-                    print("Get value: " + item)
                     self.writeToFile(item)
             time.sleep(1)
 
@@ -65,7 +64,7 @@ class Blackboard():
     def get_content(self): #O(1)
         with self.lock:
             cnt = self.content
-        return cnt
+            return cnt
 
     def propagateContent(self, parsedItem): #O(1) Expected
         with self.lock:
@@ -87,7 +86,10 @@ class Blackboard():
     
     def delete_content(self, number): # O(1) Expected
         with self.lock:
-            self.content.pop(number)
+            if self.content.has_key(number):
+                self.content.pop(number)
+            else:
+                print("Error in delete_content key not found " + str(number))
 
 
 # ------------------------------------ ------------------------------------------------------------------
@@ -244,7 +246,12 @@ class Server(Bottle):
         print(number)
         option = request.forms.get('delete')
         modified_entry = request.forms.get('entry')
-        print(option)
+
+        if option == "1":
+            self.myLogger.addToQueue('DELETE : ' + str(number))
+        else:
+            self.myLogger.addToQueue('MODIFY : ' + str(number) + " => " + modified_entry)
+
         leader_server = self.get_leader_server()
         if leader_server == self.ip:
             if option == "1":

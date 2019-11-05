@@ -9,6 +9,8 @@ from bottle import Bottle, request, template, run, static_file, redirect
 import requests
 import random
 import concurrent.futures
+import colorama
+from colorama import Fore, Style
 
 
 class UnitTest:
@@ -18,18 +20,12 @@ class UnitTest:
         self.serverList = None
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=20)
     
-    def do_parallel_task(self, method, args=None):
-        thread = Thread(target=method,
-                        args=args)
-        thread.daemon = True
-        thread.start()
+    
 
     def get_servers_list(self):
         response = self.sendRequest(self.serverIP, URI='/serverlist', req="GET")
-        print(response.content)
-
         self.serverList = json.loads(response.content)
-        print(self.serverList)
+        print(Style.BRIGHT + Fore.YELLOW + str(self.serverList))
 
     def sendRequest(self, srv_ip, URI, req='POST', dataToSend=None):
         # Try to contact another serverthrough a POST or GET
@@ -37,27 +33,26 @@ class UnitTest:
         success = False
         try:
             if 'POST' in req:
-                print(srv_ip + " Sending Request POST: " + URI + " param: " + str(dataToSend))
+                print(Fore.CYAN + srv_ip + " Sending Request POST: " + URI + " param: " + str(dataToSend))
                 f = requests.Session()
                 res = requests.post('http://{}{}'.format(srv_ip, URI), data=dataToSend )
                 
                 #res = requests.post('http://{}{}'.format(srv_ip, URI), data=json.dumps({"entry": newValue}))
                 if res.status_code == 200:
-                    print(srv_ip + " Got success for " + str(dataToSend))
+                    print(Fore.GREEN + srv_ip + " Got success for " + str(dataToSend))
                 else:
-                    print("FAILED!! status_code = " + str(res.status_code))
+                    print(Fore.RED + "FAILED!! status_code = " + str(res.status_code))
                 return res
 
             elif 'GET' in req:
-                print("sending get request")
+                print(Fore.CYAN + "sending request to server " +str(srv_ip))
                 res = requests.get('http://{}{}'.format(srv_ip, URI))
                 return res
             else:
-                print("Unexpected condition")
+                print(Fore.RED + "Unexpected condition")
 
         except Exception as e:
-            print("Found Error --> ZAKEE")
-            print("[ERROR] "+str(e))
+            print(Fore.RED + "[ERROR] "+str(e))
         return success
 
     def getRandomText(self):
@@ -71,7 +66,7 @@ class UnitTest:
     """scene 1 client connect to all servers and send 5 messages concurrently """
     def generate_Scenario1(self):
         for server in self.serverList:
-            print("Check: " + server)
+            
             for i in range(5):
                 newEntry = "text_" + self.getRandomText()
                 URI = '/board'
@@ -85,16 +80,13 @@ class UnitTest:
                 #time.sleep(0.010)
                 # self.contact_another_server(srv_ip, URI, req, dataToSend)
                 #res = self.sendRequest(server,URI,req,dataToSend)
-                print(newEntry)
-            print("\n\n")
+                
     
     
     def generate_Scenario2(self):
+        print(Style.BRIGHT + Fore.CYAN + "Sending 5 messages concurrently to all the servers")
         self.generate_Scenario1()
-        # time.sleep(1)
         for server in self.serverList:
-            print("Check: " + server)
-            
             modifiedEntry = "modified_text_" + self.getRandomText()
             URI = '/board/14/'
             req = 'POST'
@@ -103,21 +95,32 @@ class UnitTest:
             }
             dataToSend = payload
             self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
-            print("\n\n")
+            
         
-        time.sleep(20)
+        time.sleep(40)
 
         # get value from server 4 and 7 
+        print(Style.BRIGHT + Fore.CYAN + "----------------------------------------------------------------")
+        print(Style.BRIGHT + Fore.CYAN + "Requesting data from server 4 and 7")
         res4 = self.sendRequest(srv_ip='10.1.0.4',URI='/board/alldata',req='GET')
         res7 = self.sendRequest(srv_ip='10.1.0.7',URI='/board/alldata',req='GET')
         
+        data4 = json.loads(res4.content)
+        data7 = json.loads(res7.content)
+
+        for (x,y) in zip(data4,data7):
+            if data4[x] != data7[y]:
+                print("MISMATCH!! " + str(x) + " and " + str(y))
+        
 
         if res4.content == res7.content:
-            print("got same response from server 4 and 7 ")
+            print(Style.BRIGHT + Fore.GREEN + "got same response from server 4 and 7 ")
+            print(Style.BRIGHT + Fore.GREEN + "Scenario 2 success")
         else:
-            print("MISMATCH FOUND!!!!")
+            print(Fore.RED + "MISMATCH FOUND!!!!")
 
 def main():
+    colorama.init(autoreset=True)
     test = UnitTest('10.1.0.2')
     test.get_servers_list()
     test.generate_Scenario2()
