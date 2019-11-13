@@ -8,12 +8,13 @@ from threading import Lock, Thread
 import time
 import traceback
 import bottle
-from bottle import Bottle, request, template, run, static_file, redirect
+from bottle import Bottle, request, template, run, static_file, redirect, hook
 import requests
 import Queue
 import time
 import concurrent.futures
 import datetime
+from enum import Enum
 # ------------------------------------------------------------------------------------------------------
 class Logger:
     
@@ -91,11 +92,18 @@ class Blackboard():
                 print("Error in delete_content key not found " + str(number))
 
 
+class State(Enum):
+    ELECTION_MODE = 1
+    SERVING_MODE = 2
+
 # ------------------------------------ ------------------------------------------------------------------
 class Server(Bottle):
 
     def __init__(self, ID, IP, servers_list):
         super(Server, self).__init__()
+        self.serverState = State.SERVING_MODE
+        
+
         self.blackboard = Blackboard()
         self.id = int(ID)
         self.ip = str(IP)
@@ -106,10 +114,12 @@ class Server(Bottle):
 
         # list all REST URIs
         # if you add new URIs to the server, you need to add them here
+        self.hook('before_request')(self.check_srv_mode)
         self.route('/', callback=self.index)
         self.get('/board', callback=self.get_board)
         self.get('/board/alldata',callback=self.get_board_data)
         self.get('/serverlist', callback=self.get_serverlist)
+        self.get('/busy',callback=self.get_busy)
         
         self.post('/', callback=self.post_index)
         self.post('/board', callback=self.post_board)
@@ -120,7 +130,7 @@ class Server(Bottle):
         self.get('/templates/<filename:path>', callback=self.get_template)
         # You can have variables in the URI, here's an example
         # self.post('/board/<element_id:int>/', callback=self.post_board) where post_board takes an argument (integer) called element_id
-
+        
 
     def do_parallel_task(self, method, args=None):
         # create a thread running a new task
@@ -188,6 +198,7 @@ class Server(Bottle):
                                                             self.ip),
                         board_dict=board.iteritems(),
                         members_name_string='INPUT YOUR NAME HERE')
+       
 
     # get on ('/board')
     def get_board(self):
@@ -212,6 +223,7 @@ class Server(Bottle):
 
     # post on ('/board') add new entry
     def post_board(self):
+        print("inside postboard")
         newEntry = request.forms.get('entry')
         self.myLogger.addToQueue('post_board: ' + newEntry)
         leader_server = self.get_leader_server()
@@ -224,9 +236,7 @@ class Server(Bottle):
             }
             self.contact_another_server(leader_server, URI='/board', req="POST", dataToSend=payload)
             redirect('/')
-
         
-
         
 
     # post on ('/board/<number>)
@@ -288,7 +298,9 @@ class Server(Bottle):
             self.blackboard.set_content(number,modified_entry)
 
 
-
+    # GET /BUSY
+    def get_busy(self):
+        return "server is busy"
         
 
     # post on ('/')
@@ -308,6 +320,27 @@ class Server(Bottle):
     def get_leader_server(self):
         leader = min(self.servers_list)
         return leader
+
+    def start_election(self):
+        self.serverState = State.ELECTION_MODE
+        while(True):
+            time.sleep(1)
+        #
+        #
+        #
+        #
+        self.serverState = State.SERVING_MODE
+
+    @hook('before_request')
+    def check_srv_mode(self):
+        print("inside check srv mode "+str(self.serverState))
+        if self.serverState == State.ELECTION_MODE:
+            redirect('/busy')
+        else:
+            pass
+        
+
+
 
         
 
