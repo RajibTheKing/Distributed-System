@@ -115,21 +115,32 @@ class Server(Bottle):
         # list all REST URIs
         # if you add new URIs to the server, you need to add them here
         self.hook('before_request')(self.check_srv_mode)
-        self.route('/', callback=self.index)
-        self.get('/board', callback=self.get_board)
-        self.get('/board/alldata',callback=self.get_board_data)
-        self.get('/serverlist', callback=self.get_serverlist)
         self.get('/busy',callback=self.get_busy)
         
+
+        # API for Clients
+        self.route('/', callback=self.index)
+        self.get('/board', callback=self.get_board)
         self.post('/', callback=self.post_index)
         self.post('/board', callback=self.post_board)
-        self.post('/propagate', callback=self.post_propagate)
         self.post('/board/<number:int>/', callback=self.post_board_ID)
-        self.post('/propagate_deletemodify', callback=self.post_propagate_deletemodify)
+        
+        # API for Scripts
+        self.get('/serverlist', callback=self.get_serverlist, no_hook=True)
+        self.get('/board/alldata',callback=self.get_board_data , no_hook=True)
+        
+        # API for Server Internals
+        self.post('/propagate', callback=self.post_propagate, no_hook=True)
+        self.post('/propagate_deletemodify', callback=self.post_propagate_deletemodify, no_hook=True)
+        self.post('/heartbeat', callback=self.post_heartbeat, no_hook=True)
+
+
         # we give access to the templates elements
         self.get('/templates/<filename:path>', callback=self.get_template)
         # You can have variables in the URI, here's an example
         # self.post('/board/<element_id:int>/', callback=self.post_board) where post_board takes an argument (integer) called element_id
+        
+        self.executor.submit(self.KeepAliveCheck)
         
 
     def do_parallel_task(self, method, args=None):
@@ -338,6 +349,49 @@ class Server(Bottle):
             redirect('/busy')
         else:
             pass
+    
+    def post_heartbeat(self):
+        data = list(request.body)
+        parsedItem = json.loads(data[0])
+        self.myLogger.addToQueue(str(parsedItem))
+        if parsedItem['message_type'] == "Remove Server":
+            self.remove_server(parsedItem["ip"])
+        return "Ami achi"
+
+    def KeepAliveCheck(self):
+        time.sleep(5)
+        while True:
+            self.myLogger.addToQueue("Current List: " + str(self.servers_list))
+            for x in self.servers_list:
+                if x != self.ip:
+                    dataToSend = {
+                        "message_type" : "Check Alive",
+                        "ip": x
+                    }
+                    try:
+                        res = requests.post('http://{}{}'.format(x, '/heartbeat'), data=json.dumps(dataToSend), timeout=5)
+                    except requests.Timeout:
+                        self.myLogger.addToQueue("Timeout for " + str(x))
+                    except requests.ConnectionError:
+                        self.remove_server(x)
+                        self.myLogger.addToQueue("Connection Error for " + str(x))
+                        dataToSend = {
+                            "message_type" : "Remove Server",
+                            "ip": x
+                        }
+                        self.propagate_to_all_servers(URI="/heartbeat", req="POST", dataToSend=json.dumps(dataToSend))
+
+            time.sleep(10)
+    
+    def remove_server(self, ipToRemove):
+        if ipToRemove in self.servers_list:
+            self.servers_list.remove(ipToRemove)
+    
+
+
+                    
+
+
         
 
 
