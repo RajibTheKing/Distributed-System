@@ -96,31 +96,38 @@ class State(Enum):
     ELECTION_MODE = 1
     SERVING_MODE = 2
 
+class MsgType:
+    INITIATE_ELECTION = "Initiate Election"
+    REMOVE_SERVER = "Remove Server"
+
+    BULLY_ELECTION = "Election"
+    BULLY_ANSWER = "Alive"
+    BULLY_COORDINATOR = "Victory"
+
+
 # ------------------------------------ ------------------------------------------------------------------
 class Server(Bottle):
 
     def __init__(self, ID, IP, servers_list):
         super(Server, self).__init__()
-        self.serverState = State.SERVING_MODE
-        
-
         self.blackboard = Blackboard()
         self.id = int(ID)
         self.ip = str(IP)
         self.servers_list = servers_list
+        self.leader_server = "Not Selected Yet"
         # print(servers_list)
         self.myLogger = Logger(self.ip)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         # list all REST URIs
         # if you add new URIs to the server, you need to add them here
-        self.hook('before_request')(self.check_srv_mode)
+        #self.hook('before_request')(self.check_srv_mode)
         self.get('/busy',callback=self.get_busy)
         
 
         # API for Clients
-        self.route('/', callback=self.index)
-        self.get('/board', callback=self.get_board)
+        self.route('/', callback=self.index, no_hook=True)
+        self.get('/board', callback=self.get_board, no_hook=True)
         self.post('/', callback=self.post_index)
         self.post('/board', callback=self.post_board)
         self.post('/board/<number:int>/', callback=self.post_board_ID)
@@ -132,7 +139,7 @@ class Server(Bottle):
         # API for Server Internals
         self.post('/propagate', callback=self.post_propagate, no_hook=True)
         self.post('/propagate_deletemodify', callback=self.post_propagate_deletemodify, no_hook=True)
-        self.post('/heartbeat', callback=self.post_heartbeat, no_hook=True)
+        self.post('/server_controller', callback=self.post_ServerController, no_hook=True)
 
 
         # we give access to the templates elements
@@ -140,7 +147,14 @@ class Server(Bottle):
         # You can have variables in the URI, here's an example
         # self.post('/board/<element_id:int>/', callback=self.post_board) where post_board takes an argument (integer) called element_id
         
+        self.electionProcess = False
+        self.firstRun = True
+        self.serverState = State.ELECTION_MODE
+
         self.executor.submit(self.KeepAliveCheck)
+        if self.ip == min(self.servers_list):
+            self.executor.submit(self.start_election)
+
         
 
     def do_parallel_task(self, method, args=None):
@@ -237,15 +251,15 @@ class Server(Bottle):
         print("inside postboard")
         newEntry = request.forms.get('entry')
         self.myLogger.addToQueue('post_board: ' + newEntry)
-        leader_server = self.get_leader_server()
-        if self.ip == leader_server:
+        
+        if self.ip == self.leader_server:
             addedItem = self.blackboard.add_content(newEntry)
             self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps(addedItem))
         else:
             payload = {
                 'entry': newEntry,
             }
-            self.contact_another_server(leader_server, URI='/board', req="POST", dataToSend=payload)
+            self.contact_another_server(self.leader_server, URI='/board', req="POST", dataToSend=payload)
             redirect('/')
         
         
@@ -260,8 +274,8 @@ class Server(Bottle):
         else:
             self.myLogger.addToQueue('MODIFY : ' + str(number) + " => " + modified_entry)
 
-        leader_server = self.get_leader_server()
-        if leader_server == self.ip:
+        
+        if self.leader_server == self.ip:
             if option == "1":
                 self.blackboard.delete_content(number)
                 self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
@@ -283,7 +297,7 @@ class Server(Bottle):
                 'delete': option,
                 'entry': modified_entry,
             }
-            self.contact_another_server(leader_server, URI='/board/{0}/'.format(number), req="POST", dataToSend=payload)
+            self.contact_another_server(self.leader_server, URI='/board/{0}/'.format(number), req="POST", dataToSend=payload)
 
 
         redirect('/')
@@ -326,21 +340,39 @@ class Server(Bottle):
     def get_template(self, filename):
         return static_file(filename, root='./server/templates/')
 
-    
-    # Getting the leader server
-    def get_leader_server(self):
-        leader = min(self.servers_list)
-        return leader
 
     def start_election(self):
         self.serverState = State.ELECTION_MODE
-        while(True):
+        if self.firstRun:
+            time.sleep(5)
+        self.firstRun = False
+        self.electionProcess = True
+
+        for x in self.servers_list:
+            if x != self.ip:
+                toSend = {
+                    "message_type": MsgType.INITIATE_ELECTION
+                }
+                self.executor.submit(self.contact_another_server, x, URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+
+        #Bully Algorithm Starts
+        for x in self.servers_list:
+            if x > self.ip:
+                toSend = {
+                    "message_type": MsgType.BULLY_ELECTION,
+                    "ip": self.ip
+                }
+                self.executor.submit(self.contact_another_server, x, URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+
+        
+
+
+        # Wait until election completes
+        while(self.electionProcess ):
             time.sleep(1)
-        #
-        #
-        #
-        #
+        
         self.serverState = State.SERVING_MODE
+    
 
     @hook('before_request')
     def check_srv_mode(self):
@@ -350,18 +382,58 @@ class Server(Bottle):
         else:
             pass
     
-    def post_heartbeat(self):
+    def post_ServerController(self):
         data = list(request.body)
         parsedItem = json.loads(data[0])
         self.myLogger.addToQueue(str(parsedItem))
-        if parsedItem['message_type'] == "Remove Server":
+        if parsedItem['message_type'] == MsgType.REMOVE_SERVER:
             self.remove_server(parsedItem["ip"])
-        return "Ami achi"
+            return "DONE"
+        elif parsedItem['message_type'] == MsgType.INITIATE_ELECTION:
+            self.serverState = State.ELECTION_MODE
+        elif parsedItem['message_type'] == MsgType.BULLY_ELECTION:
+            toSend = {
+                "message_type": MsgType.BULLY_ANSWER,
+                "ip": self.ip
+            }
+            self.executor.submit(self.contact_another_server, parsedItem['ip'], URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+
+            flag = True
+            for x in self.servers_list:
+                if x > self.ip:
+                    flag = False
+                    toSend = {
+                        "message_type": MsgType.BULLY_ELECTION,
+                        "ip": self.ip
+                    }
+                    self.executor.submit(self.contact_another_server, x, URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+            
+            if flag:
+                self.leader_server = self.ip
+                self.serverState = State.SERVING_MODE
+                self.electionProcess = False
+                toSend = {
+                    "message_type": MsgType.BULLY_COORDINATOR,
+                    "ip": self.ip
+                }
+                self.propagate_to_all_servers(URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+
+        elif parsedItem['message_type'] == MsgType.BULLY_ANSWER:
+            self.myLogger.addToQueue("Waiting for Coordinator")
+        elif parsedItem['message_type'] == MsgType.BULLY_COORDINATOR:
+            self.leader_server = parsedItem['ip']
+            self.serverState = State.SERVING_MODE
+            self.electionProcess = False
+        else:
+            pass
+        
+        return "DONE"
 
     def KeepAliveCheck(self):
         time.sleep(5)
         while True:
             self.myLogger.addToQueue("Current List: " + str(self.servers_list))
+            self.myLogger.addToQueue("Leader Server: " + str(self.leader_server))
             for x in self.servers_list:
                 if x != self.ip:
                     dataToSend = {
@@ -369,17 +441,19 @@ class Server(Bottle):
                         "ip": x
                     }
                     try:
-                        res = requests.post('http://{}{}'.format(x, '/heartbeat'), data=json.dumps(dataToSend), timeout=5)
+                        res = requests.post('http://{}{}'.format(x, '/server_controller'), data=json.dumps(dataToSend), timeout=5)
                     except requests.Timeout:
                         self.myLogger.addToQueue("Timeout for " + str(x))
                     except requests.ConnectionError:
                         self.remove_server(x)
                         self.myLogger.addToQueue("Connection Error for " + str(x))
                         dataToSend = {
-                            "message_type" : "Remove Server",
+                            "message_type" : MsgType.REMOVE_SERVER,
                             "ip": x
                         }
-                        self.propagate_to_all_servers(URI="/heartbeat", req="POST", dataToSend=json.dumps(dataToSend))
+                        self.propagate_to_all_servers(URI="/server_controller", req="POST", dataToSend=json.dumps(dataToSend))
+                        if x == self.leader_server:
+                            self.executor.submit(self.start_election)
 
             time.sleep(10)
     
