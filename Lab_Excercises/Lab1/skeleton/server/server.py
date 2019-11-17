@@ -94,12 +94,15 @@ class Blackboard():
 
 class State(Enum):
     ELECTION_MODE = 1
-    SERVING_MODE = 2
+    BULLY_INITIAED_MODE = 2
+    BULLY_ELECTION_MODE = 3
+    BULLY_ANSWER_MODE = 4
+    SERVING_MODE = 5
+    
 
 class MsgType:
     INITIATE_ELECTION = "Initiate Election"
     REMOVE_SERVER = "Remove Server"
-
     BULLY_ELECTION = "Election"
     BULLY_ANSWER = "Alive"
     BULLY_COORDINATOR = "Victory"
@@ -121,8 +124,8 @@ class Server(Bottle):
 
         # list all REST URIs
         # if you add new URIs to the server, you need to add them here
-        #self.hook('before_request')(self.check_srv_mode)
-        self.get('/busy',callback=self.get_busy)
+        self.hook('before_request')(self.check_srv_mode)
+        self.get('/busy',callback=self.get_busy,no_hook = True)
         
 
         # API for Clients
@@ -152,8 +155,9 @@ class Server(Bottle):
         self.serverState = State.ELECTION_MODE
 
         self.executor.submit(self.KeepAliveCheck)
-        if self.ip == min(self.servers_list):
-            self.executor.submit(self.start_election)
+        
+        self.executor.submit(self.start_election)
+        self.lastSentMessage = None
 
         
 
@@ -188,7 +192,7 @@ class Server(Bottle):
         success = False
         try:
             if 'POST' in req:
-                f = requests.Session()
+                self.myLogger.addToQueue(self.ip + " => Sending to " + srv_ip+" , data = " + str(dataToSend))
                 res = requests.post('http://{}{}'.format(srv_ip, URI), data=dataToSend )
             elif 'GET' in req:
                 res = requests.get('http://{}{}'.format(srv_ip, URI))
@@ -354,6 +358,8 @@ class Server(Bottle):
                     "message_type": MsgType.INITIATE_ELECTION
                 }
                 self.executor.submit(self.contact_another_server, x, URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+            
+        self.serverState = State.ELECTION_MODE
 
         #Bully Algorithm Starts
         for x in self.servers_list:
@@ -377,53 +383,71 @@ class Server(Bottle):
     @hook('before_request')
     def check_srv_mode(self):
         print("inside check srv mode "+str(self.serverState))
-        if self.serverState == State.ELECTION_MODE:
-            redirect('/busy')
+
+        currentPath = str(request['bottle.request'])
+        if "GET" in currentPath:
+            if self.serverState != State.SERVING_MODE:
+                redirect("/busy")
+        elif "POST" in currentPath:
+            if "/board" in currentPath:
+                if self.serverState != State.SERVING_MODE:
+                    redirect("/busy")
         else:
             pass
     
     def post_ServerController(self):
         data = list(request.body)
         parsedItem = json.loads(data[0])
-        self.myLogger.addToQueue(str(parsedItem))
+        self.myLogger.addToQueue(str(parsedItem) + " serverMode = " + str(self.serverState))
         if parsedItem['message_type'] == MsgType.REMOVE_SERVER:
             self.remove_server(parsedItem["ip"])
             return "DONE"
         elif parsedItem['message_type'] == MsgType.INITIATE_ELECTION:
-            self.serverState = State.ELECTION_MODE
-        elif parsedItem['message_type'] == MsgType.BULLY_ELECTION:
-            toSend = {
-                "message_type": MsgType.BULLY_ANSWER,
-                "ip": self.ip
-            }
-            self.executor.submit(self.contact_another_server, parsedItem['ip'], URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+            if self.serverState == State.SERVING_MODE:
+                self.serverState = State.ELECTION_MODE
 
-            flag = True
-            for x in self.servers_list:
-                if x > self.ip:
-                    flag = False
-                    toSend = {
-                        "message_type": MsgType.BULLY_ELECTION,
-                        "ip": self.ip
-                    }
-                    self.executor.submit(self.contact_another_server, x, URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
-            
-            if flag:
-                self.leader_server = self.ip
-                self.serverState = State.SERVING_MODE
-                self.electionProcess = False
+        elif parsedItem['message_type'] == MsgType.BULLY_ELECTION:
+            if self.serverState == State.ELECTION_MODE:
+                self.serverState = State.BULLY_ELECTION_MODE
                 toSend = {
-                    "message_type": MsgType.BULLY_COORDINATOR,
+                    "message_type": MsgType.BULLY_ANSWER,
                     "ip": self.ip
                 }
-                self.propagate_to_all_servers(URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+                
+                self.executor.submit(self.contact_another_server, parsedItem['ip'], URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+
+                flag = True
+                for x in self.servers_list:
+                    if x > self.ip:
+                        flag = False
+                        toSend = {
+                            "message_type": MsgType.BULLY_ELECTION,
+                            "ip": self.ip
+                        }
+                        self.executor.submit(self.contact_another_server, x, URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+                
+                # This is only for Last Server with Highest IP
+                if flag:
+                    self.leader_server = self.ip
+                    self.serverState = State.SERVING_MODE
+                    self.electionProcess = False
+                    toSend = {
+                        "message_type": MsgType.BULLY_COORDINATOR,
+                        "ip": self.ip
+                    }
+                    if self.lastSentMessage != toSend:
+                        self.propagate_to_all_servers(URI="/server_controller", req="POST", dataToSend=json.dumps(toSend))
+                    self.lastSentMessage = toSend
 
         elif parsedItem['message_type'] == MsgType.BULLY_ANSWER:
-            self.myLogger.addToQueue("Waiting for Coordinator")
+            if self.serverState == State.BULLY_ELECTION_MODE:
+                self.myLogger.addToQueue("Waiting for Coordinator")
+                self.serverState = State.BULLY_ANSWER_MODE
         elif parsedItem['message_type'] == MsgType.BULLY_COORDINATOR:
             self.leader_server = parsedItem['ip']
             self.serverState = State.SERVING_MODE
             self.electionProcess = False
+            self.myLogger.addToQueue("Leader is elected :  " + str(self.leader_server))
         else:
             pass
         
@@ -434,6 +458,7 @@ class Server(Bottle):
         while True:
             self.myLogger.addToQueue("Current List: " + str(self.servers_list))
             self.myLogger.addToQueue("Leader Server: " + str(self.leader_server))
+            self.myLogger.addToQueue("Serving Mode: " + str(self.serverState))
             for x in self.servers_list:
                 if x != self.ip:
                     dataToSend = {
@@ -453,7 +478,8 @@ class Server(Bottle):
                         }
                         self.propagate_to_all_servers(URI="/server_controller", req="POST", dataToSend=json.dumps(dataToSend))
                         if x == self.leader_server:
-                            self.executor.submit(self.start_election)
+                            if self.serverState == State.SERVING_MODE:
+                                self.executor.submit(self.start_election)
 
             time.sleep(10)
     
