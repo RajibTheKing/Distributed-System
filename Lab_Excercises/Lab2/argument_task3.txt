@@ -1,0 +1,36 @@
+--> Discuss the solution cost of your LE:
+
+Answer:
+
+1. We are sending messages asynchronously. 
+2. In worst case message cost is O(n * n).
+3. But in average case we reduced the message overhead with some state management.
+
+
+
+--> Discuss whether your LE fulfills the properties of a correct LE algo:
+
+Answer: 
+We are using the concept of Bully Algorithm. But we are not completely following it's protocol.
+So our implementation doesn't fulfills all the properties of correct LE algorithm.
+
+For example, we are using server ip string as it's identifier which is not actually property of correct LE. 
+
+
+
+--> Discuss the cost of adding messages to the board:
+
+Answer:
+For n servers we need to send n messages to add a new entry.
+
+
+--> Discuss pros&cons of centralized solutions:
+
+Answer:
+Pros:
+1. Data is Consistent.
+2. Easy to implement.
+
+Cons:
+1. Not Scalable. Leader server handles all (add/modify/delete) requests.
+2. System fails when centralized node is not available.
