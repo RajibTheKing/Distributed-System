@@ -94,13 +94,14 @@ class Blackboard():
 
 class State(Enum):
     ELECTION_MODE = 1
-    BULLY_INITIAED_MODE = 2
-    BULLY_ELECTION_MODE = 3
-    BULLY_ANSWER_MODE = 4
-    SERVING_MODE = 5
+    BULLY_INITIATED_MODE = 2
+    BULLY_ANSWER_MODE = 3
+    SERVING_MODE = 4
     
 
 class MsgType:
+    CHECK_ALIVE = "Check Alive"
+    PRESENT = "Present"
     INITIATE_ELECTION = "Initiate Election"
     REMOVE_SERVER = "Remove Server"
     BULLY_ELECTION = "Election"
@@ -155,8 +156,8 @@ class Server(Bottle):
         self.serverState = State.ELECTION_MODE
 
         self.executor.submit(self.KeepAliveCheck)
-        
-        self.executor.submit(self.start_election)
+        if self.ip == min(self.servers_list):
+            self.executor.submit(self.start_election)
         self.lastSentMessage = None
 
         
@@ -401,14 +402,16 @@ class Server(Bottle):
         self.myLogger.addToQueue(str(parsedItem) + " serverMode = " + str(self.serverState))
         if parsedItem['message_type'] == MsgType.REMOVE_SERVER:
             self.remove_server(parsedItem["ip"])
-            return "DONE"
+            return "Server Removed " + parsedItem["ip"]
+        elif parsedItem['message_type'] == MsgType.CHECK_ALIVE:
+            return MsgType.PRESENT
         elif parsedItem['message_type'] == MsgType.INITIATE_ELECTION:
             if self.serverState == State.SERVING_MODE:
                 self.serverState = State.ELECTION_MODE
 
         elif parsedItem['message_type'] == MsgType.BULLY_ELECTION:
             if self.serverState == State.ELECTION_MODE:
-                self.serverState = State.BULLY_ELECTION_MODE
+                self.serverState = State.BULLY_INITIATED_MODE
                 toSend = {
                     "message_type": MsgType.BULLY_ANSWER,
                     "ip": self.ip
@@ -440,7 +443,7 @@ class Server(Bottle):
                     self.lastSentMessage = toSend
 
         elif parsedItem['message_type'] == MsgType.BULLY_ANSWER:
-            if self.serverState == State.BULLY_ELECTION_MODE:
+            if self.serverState == State.BULLY_INITIATED_MODE:
                 self.myLogger.addToQueue("Waiting for Coordinator")
                 self.serverState = State.BULLY_ANSWER_MODE
         elif parsedItem['message_type'] == MsgType.BULLY_COORDINATOR:
@@ -462,7 +465,7 @@ class Server(Bottle):
             for x in self.servers_list:
                 if x != self.ip:
                     dataToSend = {
-                        "message_type" : "Check Alive",
+                        "message_type" : MsgType.CHECK_ALIVE,
                         "ip": x
                     }
                     try:
