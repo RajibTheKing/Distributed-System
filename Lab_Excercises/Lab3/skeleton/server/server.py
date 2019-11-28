@@ -1,112 +1,11 @@
-#cd /home/mininet/Desktop/Distributed-System/Lab_Excercises/Lab1/skeleton/server
-
 # coding=utf-8
-import argparse
-import json
-import sys
-from threading import Lock, Thread
-import time
-import traceback
-import bottle
-from bottle import Bottle, request, template, run, static_file, redirect, hook
-import requests
-import Queue
-import time
-import concurrent.futures
-import datetime
-from enum import Enum
-# ------------------------------------------------------------------------------------------------------
-class Logger:
-    
-    def __init__(self, serverIP):
-        self.fileName = serverIP+".txt"
-        self.filePtr = open(self.fileName, "w+")
-        self.lock = Lock()
-        self.queue = Queue.Queue(100)
-        thread = Thread(target=self.consume)
-        thread.start()
+from allimports import *
 
-    def writeToFile(self, item):
-        self.filePtr.write(str(item["time"]) + ": " + item["text"] + "\n")
-        self.filePtr.flush()
-
-    
-    def addToQueue(self, text):
-        with self.lock:
-            datetime_object = datetime.datetime.now()
-            self.queue.put({"text": text, "time": datetime_object})
-
-    def consume(self):
-        while True:
-            with self.lock:
-                while not self.queue.empty():
-                    item = self.queue.get()
-                    self.writeToFile(item)
-            time.sleep(1)
-
-    
-
-    
-
-        
-
-class Blackboard():
-
-    def __init__(self):
-        currentTimeStamp = time.time()
-        self.content = dict()
-        # self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
-        self.lastWrittenID = 0
-        self.lock = Lock() # use lock when you modify the content
-
-
-
-    def get_content(self): #O(1)
-        with self.lock:
-            cnt = self.content
-            return cnt
-
-    def propagateContent(self, parsedItem): #O(1) Expected
-        with self.lock:
-            self.content[parsedItem['id']] = {"entry": parsedItem['entry'], "createdAt": parsedItem['createdAt']}
-
-    def add_content(self, new_content): #O(1) Expected
-        with self.lock:
-            currentTimeStamp = time.time()
-            nowID = self.lastWrittenID + 1
-            newValue  =  {"id": nowID, "entry": new_content, "createdAt": currentTimeStamp}
-            self.content[nowID] = {"entry": new_content, "createdAt": currentTimeStamp}
-            self.lastWrittenID = nowID
-            return newValue
-
-    def set_content(self,number, modified_entry): # O(1) Expected
-        with self.lock:
-            prevValue = self.content[number]
-            self.content[number] = {"entry" : modified_entry, "createdAt": prevValue["createdAt"]}
-    
-    def delete_content(self, number): # O(1) Expected
-        with self.lock:
-            if self.content.has_key(number):
-                self.content.pop(number)
-            else:
-                print("Error in delete_content key not found " + str(number))
-
-
-class State(Enum):
-    ELECTION_MODE = 1
-    BULLY_INITIATED_MODE = 2
-    BULLY_ANSWER_MODE = 3
-    SERVING_MODE = 4
-    
-
-class MsgType:
-    CHECK_ALIVE = "Check Alive"
-    PRESENT = "Present"
-    INITIATE_ELECTION = "Initiate Election"
-    REMOVE_SERVER = "Remove Server"
-    BULLY_ELECTION = "Election"
-    BULLY_ANSWER = "Alive"
-    BULLY_COORDINATOR = "Victory"
+# User defined modules
+import distributedboard
+import mylogger
+from serverState import State
+from myMsgType import MsgType
 
 
 # ------------------------------------ ------------------------------------------------------------------
@@ -114,13 +13,13 @@ class Server(Bottle):
 
     def __init__(self, ID, IP, servers_list):
         super(Server, self).__init__()
-        self.blackboard = Blackboard()
+        self.blackboard = distributedboard.Blackboard()
         self.id = int(ID)
         self.ip = str(IP)
         self.servers_list = servers_list
         self.leader_server = "Not Selected Yet"
         # print(servers_list)
-        self.myLogger = Logger(self.ip)
+        self.myLogger = mylogger.Logger(self.ip)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         # list all REST URIs
