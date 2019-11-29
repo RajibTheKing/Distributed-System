@@ -21,6 +21,7 @@ class Blackboard():
     def propagateContent(self, parsedItem): #O(1) Expected
         with self.lock:
             self.content[parsedItem['id']] = {"entry": parsedItem['entry'], "createdAt": parsedItem['createdAt']}
+            self.lastWrittenID = parsedItem['id']
 
     def add_content(self, new_content): #O(1) Expected
         with self.lock:
