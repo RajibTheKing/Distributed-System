@@ -108,6 +108,7 @@ class Server(Bottle):
     # route to ('/')
     def generateDataToShow(self):
         boardData = self.blackboard.get_content()
+        self.myLogger.addToQueue(str(boardData))
         customList = []
         for x in boardData:
             customList.append((x["id"], x["entry"]))
