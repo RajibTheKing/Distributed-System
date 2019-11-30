@@ -14,15 +14,13 @@ class Server(Bottle):
 
     def __init__(self, ID, IP, servers_list):
         super(Server, self).__init__()
-        self.blackboard = distributedboard.Blackboard()
+        
         self.id = int(ID)
         self.ip = str(IP)
         self.servers_list = servers_list
         self.serverIndex = self.servers_list.index(self.ip)
-
         self.vectorClock = VectorClock(self.serverIndex, len(self.servers_list))
-        
-        self.leader_server = "10.1.0.1"
+        self.blackboard = distributedboard.Blackboard(self.vectorClock)
         # print(servers_list)
         self.myLogger = mylogger.Logger(self.ip)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
@@ -43,7 +41,6 @@ class Server(Bottle):
         
         # API for Server Internals
         self.post('/propagate', callback=self.post_propagate)
-        self.post('/propagate_deletemodify', callback=self.post_propagate_deletemodify)
         
 
         # we give access to the templates elements
@@ -144,13 +141,11 @@ class Server(Bottle):
         print("inside postboard")
         newEntry = request.forms.get('entry')
         self.myLogger.addToQueue('post_board: ' + newEntry)
-        
-        newClock = self.vectorClock.getNext()
+
         addedItem = self.blackboard.add_content(newEntry)
         payload = {
             "Operation": "add",
-            "VClock": newClock,
-            "addedItem" : addedItem,
+            "Element" : addedItem,
         }
         self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps(payload))
  
@@ -166,33 +161,22 @@ class Server(Bottle):
             self.myLogger.addToQueue('DELETE : ' + str(number))
         else:
             self.myLogger.addToQueue('MODIFY : ' + str(number) + " => " + modified_entry)
-
         
-        if self.leader_server == self.ip:
-            if option == "1":
-                self.blackboard.delete_content(number)
-                self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
-                    {
-                        "value": option, 
-                        "number": number
-                    }))
-                
-            else:
-                self.blackboard.set_content(number,modified_entry)
-                self.propagate_to_all_servers(URI="/propagate_deletemodify", req="POST", dataToSend=json.dumps(
-                    {
-                        "value": option, 
-                        "number": number,
-                        "entry": modified_entry
-                    }))
+        if option == "1":
+            deletedItem = self.blackboard.delete_content(number)
+            self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps(
+                {
+                    "Operation": "delete", 
+                    "Element": deletedItem
+                }))
+            
         else:
-            payload = {
-                'delete': option,
-                'entry': modified_entry,
-            }
-            self.contact_another_server(self.leader_server, URI='/board/{0}/'.format(number), req="POST", dataToSend=payload)
-
-
+            modifiedItem = self.blackboard.set_content(number,modified_entry)
+            self.propagate_to_all_servers(URI="/propagate", req="POST", dataToSend=json.dumps(
+                {
+                    "Operation": "modify", 
+                    "Element": modifiedItem
+                }))
         redirect('/')
 
 
@@ -200,23 +184,8 @@ class Server(Bottle):
     def post_propagate(self):
         data = list(request.body)
         parsedItem = json.loads(data[0])
-        self.myLogger.addToQueue(str(parsedItem["VClock"]))
-        self.vectorClock.updateClock(parsedItem["VClock"])
-        self.blackboard.propagateContent(parsedItem["addedItem"])
+        self.blackboard.propagateContent(parsedItem["Operation"], parsedItem["Element"])
     
-    # post on ('/propagate_deletemodify/)
-    def post_propagate_deletemodify(self):
-        data = list(request.body)
-        parsed = json.loads(data[0])
-        option = parsed['value']
-        if option == "1":
-            number = parsed['number']
-            self.blackboard.delete_content(number)
-        else:
-            number = parsed['number']
-            modified_entry = parsed['entry']
-            self.blackboard.set_content(number,modified_entry)
-
         
 
     # post on ('/')

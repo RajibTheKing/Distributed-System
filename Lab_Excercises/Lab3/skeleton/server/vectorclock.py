@@ -15,7 +15,7 @@ class VectorClock:
         with self.lock:
             self.currentClockTime = self.currentClockTime+1
             self.vclock[self.serverIndex] = self.currentClockTime
-            return self.vclock
+            return (self.vclock, self.serverIndex)
     
     def updateClock(self, updatedClock):
         with self.lock:
