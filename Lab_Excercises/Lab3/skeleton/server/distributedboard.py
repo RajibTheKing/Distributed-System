@@ -8,7 +8,6 @@ class Blackboard():
         currentTimeStamp = time.time()
         self.content = []
         # self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
-        self.lastWrittenID = 0
         self.lock = Lock() # use lock when you modify the content
 
 
@@ -26,15 +25,13 @@ class Blackboard():
                             "createdAt": parsedItem['createdAt']
                         }
             self.content.append(dataToAdd)
-            self.lastWrittenID = parsedItem['id']
 
     def add_content(self, new_content): #O(1) Expected
         with self.lock:
             currentTimeStamp = time.time()
-            nowID = self.lastWrittenID + 1
+            nowID = str(uuid.uuid1())
             newValue  =  {"id": nowID, "entry": new_content, "createdAt": currentTimeStamp}
             self.content.append(newValue)
-            self.lastWrittenID = nowID
             return newValue
 
     def set_content(self,number, modified_entry): # O(1) Expected

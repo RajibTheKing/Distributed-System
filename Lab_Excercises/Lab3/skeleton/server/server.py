@@ -35,7 +35,7 @@ class Server(Bottle):
         self.get('/board', callback=self.get_board)
         self.post('/', callback=self.post_index)
         self.post('/board', callback=self.post_board)
-        self.post('/board/<number:int>/', callback=self.post_board_ID)
+        self.post('/board/<number>/', callback=self.post_board_ID)
         
         # API for Scripts
         self.get('/serverlist', callback=self.get_serverlist)
