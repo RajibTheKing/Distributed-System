@@ -109,34 +109,27 @@ class Server(Bottle):
 
 
     # route to ('/')
-    def index(self):
-        # we must transform the blackboard as a dict for compatiobility reasons
+    def generateDataToShow(self):
         boardData = self.blackboard.get_content()
-        board = dict()
-        for i in boardData:
-            x = boardData[i]
-            board[i] = x["entry"]
-        
+        customList = []
+        for x in boardData:
+            customList.append((x["id"], x["entry"]))
+        return customList
+
+    def index(self):
         return template('server/templates/index.tpl',
                         board_title='Server {} ({})'.format(self.id,
                                                             self.ip),
-                        board_dict=board.iteritems(),
+                        board_dict=self.generateDataToShow(),
                         members_name_string='INPUT YOUR NAME HERE')
        
 
     # get on ('/board')
     def get_board(self):
-        # we must transform the blackboard as a dict for compatibility reasons
-        boardData = self.blackboard.get_content()
-        board = dict()
-        for i in boardData:
-            x = boardData[i]
-            board[i] = x["entry"]
-        
         return template('server/templates/blackboard.tpl',
                         board_title='Server {} ({})'.format(self.id,
                                                             self.ip),
-                        board_dict=board.iteritems())
+                        board_dict=self.generateDataToShow())
     # get on ('/serverlist')
     def get_serverlist(self):
         return json.dumps(self.servers_list)
