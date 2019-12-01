@@ -20,9 +20,13 @@ class Server(Bottle):
         self.servers_list = servers_list
         self.serverIndex = self.servers_list.index(self.ip)
         self.vectorClock = VectorClock(self.serverIndex, len(self.servers_list))
-        self.blackboard = distributedboard.Blackboard(self.vectorClock)
-        # print(servers_list)
         self.myLogger = mylogger.Logger(self.ip)
+        self.blackboard = distributedboard.Blackboard(self.vectorClock, self.myLogger)
+        
+        self.queue = Queue.Queue(100)
+        thread = Thread(target=self.consume)
+        thread.start()
+        
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         # list all REST URIs
@@ -50,7 +54,11 @@ class Server(Bottle):
         
         self.lastSentMessage = None
 
-    
+    def consume(self):
+        while True:
+            while not self.queue.empty():
+                (operationType, parsedItem) = self.queue.get()
+            time.sleep(1)
         
 
     def do_parallel_task(self, method, args=None):
@@ -109,6 +117,7 @@ class Server(Bottle):
     def generateDataToShow(self):
         boardData = self.blackboard.get_content()
         self.myLogger.addToQueue(str(boardData))
+        self.myLogger.addToQueue(str(self.vectorClock.getCurrentClock()))
         customList = []
         for x in boardData:
             customList.append((x["id"], x["entry"]))

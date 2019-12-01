@@ -123,7 +123,7 @@ def main():
     colorama.init(autoreset=True)
     test = UnitTest('10.1.0.2')
     test.get_servers_list()
-    test.generate_Scenario2()
+    test.generate_Scenario1()
 
 if __name__ == '__main__':
     main()

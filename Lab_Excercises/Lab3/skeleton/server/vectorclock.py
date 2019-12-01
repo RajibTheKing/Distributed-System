@@ -11,6 +11,10 @@ class VectorClock:
             self.vclock.append(0)
         self.lock = Lock()
 
+    def getCurrentClock(self):
+        with self.lock:
+            return self.currentClockTime
+            
     def getNext(self):
         with self.lock:
             self.currentClockTime = self.currentClockTime+1
