@@ -52,11 +52,11 @@ class Blackboard():
                     self.content[i]['vclock'] = nowClock
 
                     #also add to the history log
-                    log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i])}
+                    log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i]), "index": i}
                     self.operationLog.addHistory(log)
 
 
-                    return self.content[i]
+                    return copy.deepcopy(self.content[i])
             
     
     def delete_content(self, number):
@@ -75,23 +75,47 @@ class Blackboard():
                     return ret
 
     def rollback(self, log):
-        if log["Operation"] == "add":
+        with self.lock:
             self.myLogger.addToQueue("Inside ROLLBAAACK!!!! " + str(log))
-            del self.content[log["index"]]
-        else:
-            pass
+            if log["Operation"] == "add":
+                del self.content[log["index"]]
+            elif log["Operation"] == "modify":
+                self.content[log["index"]] = log["element-old"]
+            elif log["Operation"] == "delete":
+                self.content.insert(log["index"], log["element"])
+            else:
+                pass
         
 
     def commit(self, log):
-        if log["Operation"] == "add":
+        with self.lock:
             self.myLogger.addToQueue("Inside COMMIT##### " + str(log))
-            self.content.append(log["element"])
+            if log["Operation"] == "add":
+                self.content.append(log["element"])
 
-            #also add to the history log
-            log = {"Operation" : "add", "element": log["element"], "index": len(self.content) - 1}
-            self.operationLog.addHistory(log)
-        else:
-            pass
+                #also add to the history log
+                log = {"Operation" : "add", "element": log["element"], "index": len(self.content) - 1}
+                self.operationLog.addHistory(log)
+            elif log["Operation"] == "modify":
+                for i in range(0, len(self.content)):
+                    if self.content[i]["id"] == log["element"]["id"]:
+                        oldElement = copy.deepcopy(self.content[i])
+                        self.content[i] = log["element"]
+
+                        #also add to the history log
+                        log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i]), "index": i}
+                        self.operationLog.addHistory(log)
+            elif log["Operation"] == "delete":
+                for i in range(0, len(self.content)):
+                    if self.content[i]['id'] == log["element"]["id"]:
+                        ret = copy.deepcopy(self.content[i])
+                        del self.content[i]
+
+                        #also add to the history log
+                        log = {"Operation" : "delete", "element": ret, "index": i}
+                        self.operationLog.addHistory(log)
+            else:
+                pass
 
     def isShifted(self, newElement, log):
         if log == None:
@@ -109,22 +133,28 @@ class Blackboard():
         else:
             return True
 
+
+    def revertShiftedOperations(self, parsedItem):
+        myStack = []
+        while self.isShifted(parsedItem, self.operationLog.getLast()):
+            lastLog = self.operationLog.getLast()
+            if lastLog != None:
+                myStack.append(self.operationLog.getLast())
+                self.rollback(self.operationLog.getLast())
+                self.operationLog.deleteLast()
+
+        return myStack
+
     def consume(self):
         while True:
             while not self.queue.empty():
                 (operationType, parsedItem) = self.queue.get()
                 self.vectorClock.updateClock(parsedItem["vclock"][0])
                 if operationType == "add":
-                    myStack = []
-                    while self.isShifted(parsedItem, self.operationLog.getLast()):
-                        lastLog = self.operationLog.getLast()
-                        if lastLog != None:
-                            myStack.append(self.operationLog.getLast())
-                            self.rollback(self.operationLog.getLast())
-                            self.operationLog.deleteLast()
+                    myStack = self.revertShiftedOperations(parsedItem)
 
                     self.content.append(parsedItem)
-                    #also add to the history log
+
                     log = {"Operation" : "add", "element": parsedItem, "index": len(self.content) - 1}
                     self.operationLog.addHistory(log)
 
@@ -132,6 +162,8 @@ class Blackboard():
                         self.commit(myStack.pop())
 
                 elif operationType == "modify":
+                    myStack = self.revertShiftedOperations(parsedItem)
+
                     for i in range(0, len(self.content)):
                         if self.content[i]['id'] == parsedItem['id']:
                             self.content[i] = parsedItem

@@ -63,6 +63,61 @@ class UnitTest:
             randText += chr(val)
         return randText
 
+    """scene 1 client connect to all servers and send 5 diferrent random operations concurrently """
+    def generate_SpecialScenario(self): #Not ready Yet
+        for server in self.serverList:
+            
+            for i in range(5):
+                operation = random.randint(1,4)
+                if operation == 1: #Add
+                    newEntry = "text_" + self.getRandomText()
+                    URI = '/board'
+                    req = 'POST'
+                    payload = {
+                        'entry': newEntry,
+                    }
+                    dataToSend = payload
+                    self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
+                elif operation == 2: #Modify
+                    res = self.sendRequest(srv_ip=server,URI='/board/alldata',req='GET')
+                    content = json.loads(res.content)
+                    if len(content) >= 2:
+                        index = random.randint(0, len(content)-1)
+                        randomUUID = content[index]["id"]
+                        modifiedEntry = "modified_text_" + self.getRandomText()
+                        URI = '/board/'+randomUUID+'/'
+                        req = 'POST'
+                        payload = {
+                            'entry': modifiedEntry,
+                        }
+                        dataToSend = payload
+                        self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
+                elif operation == 3: #Delete
+                    # res = self.sendRequest(srv_ip=server,URI='/board/alldata',req='GET')
+                    # print(res)
+                    # content = json.loads(res.content)
+                    # index = random.randint(0, len(content) - 1)
+                    # if index >=0:
+                    #     randomUUID = content[index]["id"]
+                    #     modifiedEntry = "modified_text_" + self.getRandomText()
+                    #     URI = '/board/'+randomUUID+'/'
+                    #     req = 'POST'
+                    #     payload = {
+                    #         'delete': "1",
+                    #         'entry': modifiedEntry,
+                    #     }
+                    #     dataToSend = payload
+                    #     self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
+                    pass
+
+
+
+                #self.do_parallel_task(self.sendRequest, args=(server, URI, req, dataToSend))
+                #time.sleep(0.010)
+                # self.contact_another_server(srv_ip, URI, req, dataToSend)
+                #res = self.sendRequest(server,URI,req,dataToSend)
+                
+    
     """scene 1 client connect to all servers and send 5 messages concurrently """
     def generate_Scenario1(self):
         for server in self.serverList:
@@ -80,8 +135,6 @@ class UnitTest:
                 #time.sleep(0.010)
                 # self.contact_another_server(srv_ip, URI, req, dataToSend)
                 #res = self.sendRequest(server,URI,req,dataToSend)
-                
-    
     
     def generate_Scenario2(self):
         print(Style.BRIGHT + Fore.CYAN + "Sending 5 messages concurrently to all the servers")
