@@ -65,7 +65,7 @@ class Blackboard():
                 if self.content[i]['id'] == number:
                     nowClock = self.vectorClock.getNext()
                     self.content[i]['vclock'] = nowClock
-                    ret = self.content[i]
+                    ret = copy.deepcopy(self.content[i])
                     del self.content[i]
 
                     #also add to the history log
@@ -105,6 +105,7 @@ class Blackboard():
                         #also add to the history log
                         log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i]), "index": i}
                         self.operationLog.addHistory(log)
+                        break
             elif log["Operation"] == "delete":
                 for i in range(0, len(self.content)):
                     if self.content[i]['id'] == log["element"]["id"]:
@@ -114,6 +115,7 @@ class Blackboard():
                         #also add to the history log
                         log = {"Operation" : "delete", "element": ret, "index": i}
                         self.operationLog.addHistory(log)
+                        break
             else:
                 pass
 
@@ -150,6 +152,7 @@ class Blackboard():
             while not self.queue.empty():
                 with self.lock:
                     (operationType, parsedItem) = self.queue.get()
+                    # print(operationType , parsedItem)
                     self.vectorClock.updateClock(parsedItem["vclock"][0])
                     if operationType == "add":
                         myStack = self.revertShiftedOperations(parsedItem)
@@ -167,14 +170,33 @@ class Blackboard():
 
                         for i in range(0, len(self.content)):
                             if self.content[i]['id'] == parsedItem['id']:
+                                oldElement = copy.deepcopy(self.content[i])
                                 self.content[i] = parsedItem
+                                #also add to the history log
+                                log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i]), "index": i}
+                                self.operationLog.addHistory(log)
+                                break
+
+                        while len(myStack) != 0:
+                            self.commit(myStack.pop())
+
                     elif operationType == "delete":
+                        myStack = self.revertShiftedOperations(parsedItem)
+
                         for i in range(0, len(self.content)):
                             if self.content[i]['id'] == parsedItem['id']:
+                                ret = copy.deepcopy(self.content[i])
                                 del self.content[i]
+                                #also add to the history log
+                                log = {"Operation" : "delete", "element": ret, "index": i}
+                                self.operationLog.addHistory(log)
+                                break
+                        
+                        while len(myStack) != 0:
+                            self.commit(myStack.pop())
                                 
                     else:
                         pirnt("Invalid Propagation")
-                time.sleep(0.5)
+                time.sleep(0.4)
             time.sleep(1)
 

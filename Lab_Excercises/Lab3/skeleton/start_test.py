@@ -68,7 +68,7 @@ class UnitTest:
         for server in self.serverList:
             
             for i in range(5):
-                operation = random.randint(1,4)
+                operation = random.randint(1,2)
                 if operation == 1: #Add
                     newEntry = "text_" + self.getRandomText()
                     URI = '/board'
@@ -176,7 +176,7 @@ def main():
     colorama.init(autoreset=True)
     test = UnitTest('10.1.0.2')
     test.get_servers_list()
-    test.generate_Scenario1()
+    test.generate_SpecialScenario()
 
 if __name__ == '__main__':
     main()

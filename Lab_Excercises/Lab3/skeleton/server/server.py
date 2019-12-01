@@ -113,8 +113,8 @@ class Server(Bottle):
 
     def index(self):
         return template('server/templates/index.tpl',
-                        board_title='Server {} ({})'.format(self.id,
-                                                            self.ip),
+                        board_title='Server {} ({}) Server Clock ({}) '.format(self.id,
+                                                            self.ip,self.vectorClock.getCurrentClock()),
                         board_dict=self.generateDataToShow(),
                         members_name_string='INPUT YOUR NAME HERE')
        
@@ -122,8 +122,8 @@ class Server(Bottle):
     # get on ('/board')
     def get_board(self):
         return template('server/templates/blackboard.tpl',
-                        board_title='Server {} ({})'.format(self.id,
-                                                            self.ip),
+                        board_title='Server {} ({}) Server Clock ({}) '.format(self.id,
+                                                            self.ip,self.vectorClock.getCurrentClock()),
                         board_dict=self.generateDataToShow())
     # get on ('/serverlist')
     def get_serverlist(self):
