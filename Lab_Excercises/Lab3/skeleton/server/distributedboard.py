@@ -9,7 +9,7 @@ class Blackboard():
         currentTimeStamp = time.time()
         self.content = []
         # self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
-        self.lock = Lock() # use lock when you modify the content
+        self.lock = RLock() # use lock when you modify the content
         self.vectorClock = vclock
         self.operationLog = OperationHistory()
         self.myLogger = logger
@@ -148,32 +148,33 @@ class Blackboard():
     def consume(self):
         while True:
             while not self.queue.empty():
-                (operationType, parsedItem) = self.queue.get()
-                self.vectorClock.updateClock(parsedItem["vclock"][0])
-                if operationType == "add":
-                    myStack = self.revertShiftedOperations(parsedItem)
+                with self.lock:
+                    (operationType, parsedItem) = self.queue.get()
+                    self.vectorClock.updateClock(parsedItem["vclock"][0])
+                    if operationType == "add":
+                        myStack = self.revertShiftedOperations(parsedItem)
 
-                    self.content.append(parsedItem)
+                        self.content.append(parsedItem)
 
-                    log = {"Operation" : "add", "element": parsedItem, "index": len(self.content) - 1}
-                    self.operationLog.addHistory(log)
+                        log = {"Operation" : "add", "element": parsedItem, "index": len(self.content) - 1}
+                        self.operationLog.addHistory(log)
 
-                    while len(myStack) != 0:
-                        self.commit(myStack.pop())
+                        while len(myStack) != 0:
+                            self.commit(myStack.pop())
 
-                elif operationType == "modify":
-                    myStack = self.revertShiftedOperations(parsedItem)
+                    elif operationType == "modify":
+                        myStack = self.revertShiftedOperations(parsedItem)
 
-                    for i in range(0, len(self.content)):
-                        if self.content[i]['id'] == parsedItem['id']:
-                            self.content[i] = parsedItem
-                elif operationType == "delete":
-                    for i in range(0, len(self.content)):
-                        if self.content[i]['id'] == parsedItem['id']:
-                            del self.content[i]
-                            
-                else:
-                    pirnt("Invalid Propagation")
+                        for i in range(0, len(self.content)):
+                            if self.content[i]['id'] == parsedItem['id']:
+                                self.content[i] = parsedItem
+                    elif operationType == "delete":
+                        for i in range(0, len(self.content)):
+                            if self.content[i]['id'] == parsedItem['id']:
+                                del self.content[i]
+                                
+                    else:
+                        pirnt("Invalid Propagation")
                 time.sleep(0.5)
             time.sleep(1)
 
