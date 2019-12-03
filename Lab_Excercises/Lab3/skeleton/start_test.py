@@ -35,7 +35,7 @@ class UnitTest:
             if 'POST' in req:
                 print(Fore.CYAN + srv_ip + " Sending Request POST: " + URI + " param: " + str(dataToSend))
                 f = requests.Session()
-                res = requests.post('http://{}{}'.format(srv_ip, URI), data=dataToSend )
+                res = requests.post('http://{}{}'.format(srv_ip, URI), data=dataToSend, timeout=5)
                 
                 #res = requests.post('http://{}{}'.format(srv_ip, URI), data=json.dumps({"entry": newValue}))
                 if res.status_code == 200:

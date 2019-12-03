@@ -25,6 +25,10 @@ class Blackboard():
     def getAll_Operation_Vclocks(self):
         with self.lock:
             return self.operationLog.getAllOperationTime()
+    
+    def getAll_ComplementedLOg(self, vClockList):
+        with self.lock:
+            return self.operationLog.getComplementedLog(vClockList)
 
     def get_content(self): #O(1)
         with self.lock:
@@ -32,7 +36,6 @@ class Blackboard():
             return cnt
 
     def propagateContent(self, operationType, parsedItem):
-        with self.lock:
             self.queue.put((operationType, parsedItem))
 
     def add_content(self, new_content): #O(1)
@@ -157,8 +160,11 @@ class Blackboard():
 
     def consume(self):
         while True:
+            self.myLogger.addToQueue("consume Main Loop")
             while not self.queue.empty():
+                self.myLogger.addToQueue("consume just before lock")
                 with self.lock:
+                    self.myLogger.addToQueue("consume now Lockkeeed!!!!")
                     (operationType, parsedItem) = self.queue.get()
                     # print(operationType , parsedItem)
                     self.vectorClock.updateClock(parsedItem["vclock"][0])
@@ -205,6 +211,6 @@ class Blackboard():
                                 
                     else:
                         pirnt("Invalid Propagation")
-                time.sleep(0.4)
+                time.sleep(0.5)
             time.sleep(1)
 

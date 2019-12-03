@@ -53,11 +53,35 @@ class Server(Bottle):
         thread = Thread(target=self.checkUpdatesOfOtherServers)
         thread.start()
 
+    def operateOnUncommittedLog(self, logList):
+        for x in logList:
+            self.myLogger.addToQueue("Uncommited Operation" + str(x))
+            self.blackboard.propagateContent(x["Operation"], x["element"])
+            time.sleep(0.5)
+        self.myLogger.addToQueue("Done Sending to Queue")
 
     def post_update_ctrl(self):
         data = list(request.body)
         parsedItem = json.loads(data[0])
-        self.myLogger.addToQueue(str(parsedItem["msgType"] + " --> " + str(parsedItem["VclockList"])))
+        self.myLogger.addToQueue("Inside post_update_ctrl " + str(parsedItem["msgType"]))
+        if parsedItem["msgType"] == "Request For History":
+            complementedLog = self.blackboard.getAll_ComplementedLOg(parsedItem["VclockList"])
+            payload = {
+                "msgType" : "Uncommited History",
+                "historyList": complementedLog
+            }
+            self.executor.submit(self.contact_another_server, parsedItem["ip"], "/update_ctrl", "POST", dataToSend=json.dumps(payload))
+        elif parsedItem["msgType"] == "Uncommited History":
+            self.myLogger.addToQueue("Try to add all: " + str(parsedItem["historyList"]))
+            historyToCommit = parsedItem["historyList"]
+            self.executor.submit(self.operateOnUncommittedLog, historyToCommit)
+            
+        else:
+            #do nothing.. 
+            pass
+
+
+            
 
 
     def get_operation_log_size(self):
@@ -70,6 +94,7 @@ class Server(Bottle):
             check_count.append(0)
             server_logCount.append(0)
         
+        time.sleep(10)
         while True:
             for i in range(0, len(self.servers_list)):
                 x = self.servers_list[i]
@@ -96,11 +121,17 @@ class Server(Bottle):
                                 # Need to get un-propagated history from that server
                                 self.myLogger.addToQueue("I am ready to get Data from " + x)
                                 payload = {
+                                    "ip" : self.ip,
                                     "msgType": "Request For History",
                                     "VclockList": self.blackboard.getAll_Operation_Vclocks()
                                 }
                                 self.executor.submit(self.contact_another_server, x, "/update_ctrl", "POST", dataToSend=json.dumps(payload))
-
+                                time.sleep(10)
+                                for i in range(0, len(self.servers_list)):
+                                    check_count[i] = 0
+                                    server_logCount[i] = 0 
+                                break
+                                
                             else:
                                 check_count[i] = 0
                                 server_logCount[i] = 0
@@ -126,7 +157,7 @@ class Server(Bottle):
         success = False
         try:
             if 'POST' in req:
-                self.myLogger.addToQueue(self.ip + " => Sending to " + srv_ip+" , data = " + str(dataToSend))
+                #self.myLogger.addToQueue(self.ip + " => Sending to " + srv_ip+" , data = " + str(dataToSend))
                 res = requests.post('http://{}{}'.format(srv_ip, URI), data=dataToSend )
             elif 'GET' in req:
                 res = requests.get('http://{}{}'.format(srv_ip, URI))
@@ -146,7 +177,7 @@ class Server(Bottle):
     # route to ('/')
     def generateDataToShow(self):
         boardData = self.blackboard.get_content()
-        self.myLogger.addToQueue(str(boardData))
+        #self.myLogger.addToQueue(str(boardData))
         self.myLogger.addToQueue(str(self.vectorClock.getCurrentClock()))
         customList = []
         for x in boardData:

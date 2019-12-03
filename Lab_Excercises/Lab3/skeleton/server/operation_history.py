@@ -3,7 +3,7 @@ from allimports import *
 class OperationHistory:
     def __init__(self):
         self.operationLog = []
-        self.lock = Lock()
+        self.lock = RLock()
     
     def addHistory(self, content):
         with self.lock:
@@ -33,6 +33,21 @@ class OperationHistory:
             for x in self.operationLog:
                 vclockList.append(x["element"]["vclock"])
             return vclockList
+    
+    def getComplementedLog(self, vClockList):
+        with self.lock:
+            ret = []
+            for x in self.operationLog:
+                clk = x["element"]["vclock"]
+                if clk not in vClockList:
+                    ret.append(x)
+            
+            return ret
+
+
+
+
+
 
 
     
