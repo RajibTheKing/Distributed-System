@@ -92,30 +92,8 @@ class UnitTest:
                         }
                         dataToSend = payload
                         self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
-                elif operation == 3: #Delete
-                    # res = self.sendRequest(srv_ip=server,URI='/board/alldata',req='GET')
-                    # print(res)
-                    # content = json.loads(res.content)
-                    # index = random.randint(0, len(content) - 1)
-                    # if index >=0:
-                    #     randomUUID = content[index]["id"]
-                    #     modifiedEntry = "modified_text_" + self.getRandomText()
-                    #     URI = '/board/'+randomUUID+'/'
-                    #     req = 'POST'
-                    #     payload = {
-                    #         'delete': "1",
-                    #         'entry': modifiedEntry,
-                    #     }
-                    #     dataToSend = payload
-                    #     self.executor.submit(self.sendRequest, server, URI, req, dataToSend)
+                else:
                     pass
-
-
-
-                #self.do_parallel_task(self.sendRequest, args=(server, URI, req, dataToSend))
-                #time.sleep(0.010)
-                # self.contact_another_server(srv_ip, URI, req, dataToSend)
-                #res = self.sendRequest(server,URI,req,dataToSend)
                 
     
     """scene 1 client connect to all servers and send 5 messages concurrently """
@@ -176,7 +154,7 @@ def main():
     colorama.init(autoreset=True)
     test = UnitTest('10.1.0.2')
     test.get_servers_list()
-    test.generate_SpecialScenario()
+    test.generate_Scenario1()
 
 if __name__ == '__main__':
     main()

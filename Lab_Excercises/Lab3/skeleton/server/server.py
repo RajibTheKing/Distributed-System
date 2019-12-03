@@ -47,32 +47,64 @@ class Server(Bottle):
         # You can have variables in the URI, here's an example
         # self.post('/board/<element_id:int>/', callback=self.post_board) where post_board takes an argument (integer) called element_id
         
-        self.lastSentMessage = None
+        # Lab3 Option Task!!!!
+        self.get('/operation_log_size', callback=self.get_operation_log_size)
+        thread = Thread(target=self.checkUpdatesOfOtherServers)
+        #thread.start()
 
-    def do_parallel_task(self, method, args=None):
-        # create a thread running a new task
-        # Usage example: self.do_parallel_task(self.contact_another_server, args=("10.1.0.2", "/index", "POST", params_dict))
-        # this would start a thread sending a post request to server 10.1.0.2 with URI /index and with params params_dict
-        thread = Thread(target=method,
-                        args=args)
-        thread.daemon = True
-        thread.start()
+    def get_operation_log_size(self):
+        return json.dumps(self.blackboard.getOperationLogSize())
 
+    def checkUpdatesOfOtherServers(self):
+        check_count = []
+        server_logCount = []
+        for i in range(0, len(self.servers_list)):
+            check_count.append(0)
+            server_logCount.append(0)
+        
+        while True:
+            for i in range(0, len(self.servers_list)):
+                x = self.servers_list[i]
+                if x != self.ip: 
+                    try:
+                        res = requests.get('http://{}{}'.format(x, '/operation_log_size'), timeout=5)
+                        ownHistorySize = self.blackboard.getOperationLogSize()
+                        otherHistorySize = json.loads(res.content)
+                        self.myLogger.addToQueue("Own History Size: " + str(ownHistorySize) + " <--> " + x + ": server's History Size " + str(otherHistorySize))
+                        if check_count[i] == 0:
+                            check_count[i] = check_count[i] + 1
+                            server_logCount[i] = otherHistorySize
+                        else:
+                            if server_logCount[i] == otherHistorySize:
+                                check_count[i] = check_count[i] + 1
+                            else:
+                                check_count[i] = 0
+                                server_logCount[i] = 0
+                        
+                        if(check_count[i] == 3):
+                            if ownHistorySize < server_logCount[i]:
+                                # If Comes Here... After trying 3 times, got to know that...
+                                # Other servers surely have more history than me... 
+                                # Need to get un-propagated history from that server
+                                self.myLogger.addToQueue("I am ready to get Data from " + x)
+                            else:
+                                check_count[i] = 0
+                                server_logCount[i] = 0
 
-    def do_parallel_task_after_delay(self, delay, method, args=None):
-        # create a thread, and run a task after a specified delay
-        # Usage example: self.do_parallel_task_after_delay(10, self.start_election, args=(,))
-        # this would start a thread starting an election after 10 seconds
-        thread = Thread(target=self._wrapper_delay_and_execute,
-                        args=(delay, method, args))
-        thread.daemon = True
-        thread.start()
+                            
 
+                    except requests.Timeout:
+                        self.myLogger.addToQueue("checkUpdatesOfOtherServers Timeout for " + str(x))
+                        check_count[i] = 0
+                        server_logCount[i] = 0
 
-    def _wrapper_delay_and_execute(self, delay, method, args):
-        time.sleep(delay) # in sec
-        method(*args)
-
+                    except requests.ConnectionError:
+                        self.myLogger.addToQueue("checkUpdatesOfOtherServers Connection Error for " + str(x))
+                        check_count[i] = 0
+                        server_logCount[i] = 0
+                        
+            time.sleep(10)
+    
 
     def contact_another_server(self, srv_ip, URI, req='POST', dataToSend=None):
         # Try to contact another serverthrough a POST or GET
@@ -94,11 +126,7 @@ class Server(Bottle):
     def propagate_to_all_servers(self, URI, req='POST', dataToSend=None):
         for srv_ip in self.servers_list:
             if srv_ip != self.ip: # don't propagate to yourself
-                # self.do_parallel_task(self.contact_another_server, args=(srv_ip, URI, req, dataToSend))
                 self.executor.submit(self.contact_another_server, srv_ip, URI, req, dataToSend)
-                #success =  self.contact_another_server(srv_ip, URI, req, dataToSend)
-                #if not success:
-                #    print("[WARNING ]Could not contact server {}".format(srv_ip))
 
 
     # route to ('/')

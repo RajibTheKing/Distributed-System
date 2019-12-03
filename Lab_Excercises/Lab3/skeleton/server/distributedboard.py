@@ -18,6 +18,10 @@ class Blackboard():
         thread.start()
 
 
+    def getOperationLogSize(self):
+        with self.lock:
+            return self.operationLog.getSize()
+
     def get_content(self): #O(1)
         with self.lock:
             cnt = self.content
@@ -74,7 +78,7 @@ class Blackboard():
 
                     return ret
 
-    def rollback(self, log):
+    def rollback(self, log): #MUST be atomic operation
         with self.lock:
             self.myLogger.addToQueue("Inside ROLLBAAACK!!!! " + str(log))
             if log["Operation"] == "add":
@@ -87,7 +91,7 @@ class Blackboard():
                 pass
         
 
-    def commit(self, log):
+    def commit(self, log): #MUST be atomic operation
         with self.lock:
             self.myLogger.addToQueue("Inside COMMIT##### " + str(log))
             if log["Operation"] == "add":

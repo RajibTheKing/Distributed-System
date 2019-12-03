@@ -22,5 +22,9 @@ class OperationHistory:
     def getHistory(self):
         with self.lock:
             self.operationLog
+
+    def getSize(self):
+        with self.lock:
+            return len(self.operationLog)
     
     
