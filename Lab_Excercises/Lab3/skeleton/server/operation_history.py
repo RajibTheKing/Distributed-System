@@ -26,5 +26,14 @@ class OperationHistory:
     def getSize(self):
         with self.lock:
             return len(self.operationLog)
+
+    def getAllOperationTime(self):
+        with self.lock:
+            vclockList = []
+            for x in self.operationLog:
+                vclockList.append(x["element"]["vclock"])
+            return vclockList
+
+
     
     

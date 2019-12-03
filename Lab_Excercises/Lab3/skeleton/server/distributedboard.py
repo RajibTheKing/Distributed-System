@@ -21,6 +21,10 @@ class Blackboard():
     def getOperationLogSize(self):
         with self.lock:
             return self.operationLog.getSize()
+            
+    def getAll_Operation_Vclocks(self):
+        with self.lock:
+            return self.operationLog.getAllOperationTime()
 
     def get_content(self): #O(1)
         with self.lock:

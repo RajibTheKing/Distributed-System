@@ -40,6 +40,7 @@ class Server(Bottle):
         
         # API for Server Internals
         self.post('/propagate', callback=self.post_propagate)
+        self.post('/update_ctrl', callback=self.post_update_ctrl)
         
 
         # we give access to the templates elements
@@ -50,7 +51,14 @@ class Server(Bottle):
         # Lab3 Option Task!!!!
         self.get('/operation_log_size', callback=self.get_operation_log_size)
         thread = Thread(target=self.checkUpdatesOfOtherServers)
-        #thread.start()
+        thread.start()
+
+
+    def post_update_ctrl(self):
+        data = list(request.body)
+        parsedItem = json.loads(data[0])
+        self.myLogger.addToQueue(str(parsedItem["msgType"] + " --> " + str(parsedItem["VclockList"])))
+
 
     def get_operation_log_size(self):
         return json.dumps(self.blackboard.getOperationLogSize())
@@ -87,6 +95,12 @@ class Server(Bottle):
                                 # Other servers surely have more history than me... 
                                 # Need to get un-propagated history from that server
                                 self.myLogger.addToQueue("I am ready to get Data from " + x)
+                                payload = {
+                                    "msgType": "Request For History",
+                                    "VclockList": self.blackboard.getAll_Operation_Vclocks()
+                                }
+                                self.executor.submit(self.contact_another_server, x, "/update_ctrl", "POST", dataToSend=json.dumps(payload))
+
                             else:
                                 check_count[i] = 0
                                 server_logCount[i] = 0
