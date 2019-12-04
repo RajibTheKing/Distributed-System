@@ -100,7 +100,7 @@ class UnitTest:
     def generate_Scenario1(self):
         for server in self.serverList:
             
-            for i in range(2):
+            for i in range(10):
                 newEntry = "text_" + self.getRandomText()
                 URI = '/board'
                 req = 'POST'

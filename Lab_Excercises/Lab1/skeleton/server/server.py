@@ -52,12 +52,15 @@ class Logger:
 
 class Blackboard():
 
-    def __init__(self):
+    def __init__(self,logger):
         currentTimeStamp = time.time()
         self.content = dict()
         # self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
         self.lastWrittenID = 0
         self.lock = Lock() # use lock when you modify the content
+        self.first_operation_time = 0
+        self.last_operation_time = 0
+        self.myLogger = logger
 
 
 
@@ -68,10 +71,18 @@ class Blackboard():
 
     def propagateContent(self, parsedItem): #O(1) Expected
         with self.lock:
+            if self.first_operation_time <=0:
+                self.first_operation_time = time.time()
+
+            self.last_operation_time = time.time()
             self.content[parsedItem['id']] = {"entry": parsedItem['entry'], "createdAt": parsedItem['createdAt']}
 
     def add_content(self, new_content): #O(1) Expected
         with self.lock:
+            if self.first_operation_time <= 0:
+                self.first_operation_time = time.time()
+            else:
+                self.last_operation_time = time.time()
             currentTimeStamp = time.time()
             nowID = self.lastWrittenID + 1
             newValue  =  {"id": nowID, "entry": new_content, "createdAt": currentTimeStamp}
@@ -81,15 +92,20 @@ class Blackboard():
 
     def set_content(self,number, modified_entry): # O(1) Expected
         with self.lock:
+            self.last_operation_time = time.time()
             prevValue = self.content[number]
             self.content[number] = {"entry" : modified_entry, "createdAt": prevValue["createdAt"]}
     
     def delete_content(self, number): # O(1) Expected
         with self.lock:
+            self.last_operation_time = time.time()
             if self.content.has_key(number):
                 self.content.pop(number)
             else:
                 print("Error in delete_content key not found " + str(number))
+    def get_operation_time_diff(self):
+        self.myLogger.addToQueue("time difff ====> "+str(self.first_operation_time) +"  "+str(self.last_operation_time ))
+        return self.last_operation_time - self.first_operation_time
 
 
 class State(Enum):
@@ -114,13 +130,14 @@ class Server(Bottle):
 
     def __init__(self, ID, IP, servers_list):
         super(Server, self).__init__()
-        self.blackboard = Blackboard()
+        
         self.id = int(ID)
         self.ip = str(IP)
         self.servers_list = servers_list
         self.leader_server = "Not Selected Yet"
         # print(servers_list)
         self.myLogger = Logger(self.ip)
+        self.blackboard = Blackboard(self.myLogger)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         # list all REST URIs
@@ -217,6 +234,7 @@ class Server(Bottle):
     # route to ('/')
     def index(self):
         # we must transform the blackboard as a dict for compatiobility reasons
+        self.myLogger.addToQueue("operation time difference : " + str(self.blackboard.get_operation_time_diff()))
         boardData = self.blackboard.get_content()
         board = dict()
         for i in boardData:
@@ -233,6 +251,7 @@ class Server(Bottle):
     # get on ('/board')
     def get_board(self):
         # we must transform the blackboard as a dict for compatibility reasons
+        self.myLogger.addToQueue("operation time difference : " + str(self.blackboard.get_operation_time_diff()))
         boardData = self.blackboard.get_content()
         board = dict()
         for i in boardData:

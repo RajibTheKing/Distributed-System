@@ -179,6 +179,7 @@ class Server(Bottle):
     def generateDataToShow(self):
         boardData = self.blackboard.get_content()
         #self.myLogger.addToQueue(str(boardData))
+        self.myLogger.addToQueue("time diff for operation ===========> " + str(self.blackboard.get_operation_time_diff()))
         self.myLogger.addToQueue(str(self.vectorClock.getCurrentClock()))
         customList = []
         for x in boardData:

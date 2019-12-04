@@ -16,6 +16,8 @@ class Blackboard():
         self.queue = Queue.Queue(100)
         thread = Thread(target=self.consume)
         thread.start()
+        self.ftime = 0
+        self.ltime = 0
 
 
     def getOperationLogSize(self):
@@ -42,12 +44,16 @@ class Blackboard():
 
     def add_content(self, new_content): #O(1)
         with self.lock:
+            
             currentTimeStamp = time.time()
             nowID = str(uuid.uuid1())
             nowClock = self.vectorClock.getNext()
             newValue  =  {"id": nowID, "entry": new_content, "createdAt": currentTimeStamp, "vclock": nowClock}
             self.content.append(newValue)
 
+            if self.ftime <= 0:
+                self.ftime = time.time()
+            self.ltime = time.time()
             #also add to the history log
             log = {"Operation" : "add", "element": newValue, "index": len(self.content) - 1}
             self.operationLog.addHistory(log)
@@ -63,7 +69,7 @@ class Blackboard():
                     nowClock = self.vectorClock.getNext()
                     self.content[i]['entry'] = modified_entry
                     self.content[i]['vclock'] = nowClock
-
+                    self.ltime = time.time()
                     #also add to the history log
                     log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i]), "index": i}
                     self.operationLog.addHistory(log)
@@ -80,7 +86,7 @@ class Blackboard():
                     self.content[i]['vclock'] = nowClock
                     ret = copy.deepcopy(self.content[i])
                     del self.content[i]
-
+                    self.ltime = time.time()
                     #also add to the history log
                     log = {"Operation" : "delete", "element": ret, "index": i}
                     self.operationLog.addHistory(log)
@@ -105,7 +111,7 @@ class Blackboard():
             self.myLogger.addToQueue("Inside COMMIT##### " + str(log))
             if log["Operation"] == "add":
                 self.content.append(log["element"])
-
+                self.ltime = time.time()
                 #also add to the history log
                 log = {"Operation" : "add", "element": log["element"], "index": len(self.content) - 1}
                 self.operationLog.addHistory(log)
@@ -114,7 +120,7 @@ class Blackboard():
                     if self.content[i]["id"] == log["element"]["id"]:
                         oldElement = copy.deepcopy(self.content[i])
                         self.content[i] = log["element"]
-
+                        self.ltime = time.time()
                         #also add to the history log
                         log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i]), "index": i}
                         self.operationLog.addHistory(log)
@@ -124,7 +130,7 @@ class Blackboard():
                     if self.content[i]['id'] == log["element"]["id"]:
                         ret = copy.deepcopy(self.content[i])
                         del self.content[i]
-
+                        self.ltime = time.time()
                         #also add to the history log
                         log = {"Operation" : "delete", "element": ret, "index": i}
                         self.operationLog.addHistory(log)
@@ -172,9 +178,13 @@ class Blackboard():
                     self.vectorClock.updateClock(parsedItem["vclock"][0])
                     if operationType == "add":
                         myStack = self.revertShiftedOperations(parsedItem)
-
+                        
+                        
                         self.content.append(parsedItem)
-
+                        if self.ftime <= 0:
+                            self.ftime = time.time()
+                        self.ltime = time.time()
+                        #also add to the history log
                         log = {"Operation" : "add", "element": parsedItem, "index": len(self.content) - 1}
                         self.operationLog.addHistory(log)
 
@@ -188,6 +198,7 @@ class Blackboard():
                             if self.content[i]['id'] == parsedItem['id']:
                                 oldElement = copy.deepcopy(self.content[i])
                                 self.content[i] = parsedItem
+                                self.ltime = time.time()
                                 #also add to the history log
                                 log = {"Operation" : "modify", "element-old": oldElement, "element": copy.deepcopy(self.content[i]), "index": i}
                                 self.operationLog.addHistory(log)
@@ -203,6 +214,7 @@ class Blackboard():
                             if self.content[i]['id'] == parsedItem['id']:
                                 ret = copy.deepcopy(self.content[i])
                                 del self.content[i]
+                                self.ltime = time.time()
                                 #also add to the history log
                                 log = {"Operation" : "delete", "element": ret, "index": i}
                                 self.operationLog.addHistory(log)
@@ -216,3 +228,6 @@ class Blackboard():
                 time.sleep(0.5)
             time.sleep(1)
 
+    def get_operation_time_diff(self):
+
+        return self.ltime - self.ftime
