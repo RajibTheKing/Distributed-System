@@ -1,9 +1,10 @@
 from allimports import *
 
 class OperationHistory:
-    def __init__(self):
+    def __init__(self, logger):
         self.operationLog = []
         self.lock = RLock()
+        self.myLogger = logger
     
     def addHistory(self, content):
         with self.lock:
@@ -40,6 +41,7 @@ class OperationHistory:
             for x in self.operationLog:
                 clk = x["element"]["vclock"]
                 if clk not in vClockList:
+                    self.myLogger.addToQueue(str(clk) + " --> " + str(vClockList))
                     ret.append(x)
             
             return ret

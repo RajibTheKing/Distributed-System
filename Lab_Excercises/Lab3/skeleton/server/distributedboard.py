@@ -11,7 +11,7 @@ class Blackboard():
         # self.content[1] = {"entry": "First", "createdAt": currentTimeStamp}
         self.lock = RLock() # use lock when you modify the content
         self.vectorClock = vclock
-        self.operationLog = OperationHistory()
+        self.operationLog = OperationHistory(logger)
         self.myLogger = logger
         self.queue = Queue.Queue(100)
         thread = Thread(target=self.consume)
@@ -36,6 +36,8 @@ class Blackboard():
             return cnt
 
     def propagateContent(self, operationType, parsedItem):
+        with self.lock:
+            self.myLogger.addToQueue("blackboard Propation " + str(operationType) + " -> " + str(parsedItem))
             self.queue.put((operationType, parsedItem))
 
     def add_content(self, new_content): #O(1)

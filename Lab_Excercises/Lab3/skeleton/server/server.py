@@ -65,6 +65,7 @@ class Server(Bottle):
         parsedItem = json.loads(data[0])
         self.myLogger.addToQueue("Inside post_update_ctrl " + str(parsedItem["msgType"]))
         if parsedItem["msgType"] == "Request For History":
+            self.myLogger.addToQueue("VclockList = " + str(parsedItem["VclockList"]))
             complementedLog = self.blackboard.getAll_ComplementedLOg(parsedItem["VclockList"])
             payload = {
                 "msgType" : "Uncommited History",

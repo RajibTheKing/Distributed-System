@@ -21,7 +21,7 @@ class VectorClock:
             self.vclock[self.serverIndex] = self.currentClockTime
 
             #We need deepcopy to ensure returning a new list without returning a reference
-            return (copy.deepcopy(self.vclock), self.serverIndex)
+            return [copy.deepcopy(self.vclock), self.serverIndex]
     
     def updateClock(self, updatedClock):
         with self.lock:
