@@ -143,16 +143,34 @@ class Blackboard():
             return False
 
         (elementClock, elementIndex) = newElement["vclock"]
+        otherSideClock = elementClock
+
         (logClock, logIndex) = log["element"]["vclock"]
-        if elementClock[elementIndex] > logClock[logIndex]:
-            return False
-        elif elementClock[elementIndex] == logClock[logIndex]:
-            if elementIndex > logIndex:
+        localClock = logClock
+
+        # Va < Vb Iff each Va[i] <= Vb[i] && exists a j where Va[j] < Vb[j],  a -> b
+        decision = True
+        j = -1
+        for i in range(0, len(localClock)):
+            if otherSideClock[i] < localClock[i]:
+                j = i
+            elif otherSideClock[i] == localClock[i]:
+                pass
+            else:
+                decision = False
+
+        if decision == True:
+            return True
+        else:
+            if elementClock[elementIndex] > logClock[logIndex]:
                 return False
+            elif elementClock[elementIndex] == logClock[logIndex]:
+                if elementIndex > logIndex:
+                    return False
+                else:
+                    return True
             else:
                 return True
-        else:
-            return True
 
 
     def revertShiftedOperations(self, parsedItem):

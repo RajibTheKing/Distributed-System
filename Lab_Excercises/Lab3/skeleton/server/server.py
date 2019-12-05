@@ -183,7 +183,7 @@ class Server(Bottle):
         self.myLogger.addToQueue(str(self.vectorClock.getCurrentClock()))
         customList = []
         for x in boardData:
-            customList.append((x["id"], x["entry"]))
+            customList.append((x["id"], x["entry"], x["vclock"]))
         return customList
 
     def index(self):
