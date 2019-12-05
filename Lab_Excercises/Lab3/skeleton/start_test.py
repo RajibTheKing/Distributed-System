@@ -100,7 +100,7 @@ class UnitTest:
     def generate_Scenario1(self):
         for server in self.serverList:
             
-            for i in range(5):
+            for i in range(10):
                 newEntry = "text_" + self.getRandomText()
                 URI = '/board'
                 req = 'POST'
@@ -152,7 +152,7 @@ class UnitTest:
 
 def main():
     colorama.init(autoreset=True)
-    test = UnitTest('10.1.0.2')
+    test = UnitTest('10.1.0.5')
     test.get_servers_list()
     test.generate_Scenario1()
 

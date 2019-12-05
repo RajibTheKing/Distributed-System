@@ -159,7 +159,7 @@ class Blackboard():
             else:
                 decision = False
 
-        if decision == True:
+        if decision == True and j != -1:
             return True
         else:
             if elementClock[elementIndex] > logClock[logIndex]:
