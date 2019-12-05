@@ -1,0 +1,59 @@
+
+first run simulation from start_topology_segmented.py
+-- sudo python start_topology_segmented.py
+
+
+first run the testscript to add message to all servers
+-- sudo python start_test.py
+
+check all servers are connected
+
+inside mininer cli
+>pingall
+
+
+now lets segment the network this is our topology 
+
+  h1 ----s1-----s01        s02 ------s8-----h8
+               /  /\        / \  \
+  h2 ----s2---/  /  \      /   \  \----s7-----h7
+ h3------s3-----/    \    /     \-------s6--h6
+ h4------s4--- /      \s5/    
+                       |
+                       |
+                       |
+                       h5
+
+to segment use commad
+
+mininet > link s01 s5 down
+
+
+  h1 ----s1-----s01        s02 ------s8-----h8
+               /  /        / \  \
+  h2 ----s2---/  /        /   \  \----s7-----h7
+ h3------s3-----/        /     \-------s6--h6
+ h4------s4--- /      s5/    
+                       |
+                       |
+                       |
+                       h5
+
+
+now open two terminal from any host of those segmented network
+
+>xterm server1
+>xterm server6
+
+
+in those terminal  open browser and see the current state of the data inside 
+
+make some transactions and then see the update separately 
+
+servers from difrent segment will be consistent within their network
+
+now bring the link up 
+mininet > link s01 s5 up
+
+wait atleast 50 sec to see  the convergence started to happen 
+and eventually all of the servers will converge and will be consistent in data.
