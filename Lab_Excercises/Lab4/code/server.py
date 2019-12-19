@@ -3,6 +3,8 @@ from allimports import *
 
 # User defined modules
 import mylogger
+from byzantine_behavior import *
+from votemanager import *
 
 
 # ------------------------------------ ------------------------------------------------------------------
@@ -15,6 +17,9 @@ class Server(Bottle):
         self.ip = str(IP)
         self.servers_list = servers_list
         self.myLogger = mylogger.Logger(self.ip)
+        self.myByzantine = Byzantine_Behavior()
+        self.myVoteManager = VoteManager(self.servers_list)
+
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
         # list all REST URIs
@@ -81,13 +86,6 @@ class Server(Bottle):
         return json.dumps(self.blackboard.get_content())
 
 
-    # post on ('/propagate')
-    def post_propagate(self):
-        data = list(request.body)
-        parsedItem = json.loads(data[0])
-        self.blackboard.propagateContent(parsedItem["Operation"], parsedItem["Element"])
-    
-        
 
 
     def get_template(self, filename):
@@ -100,16 +98,33 @@ class Server(Bottle):
 
     def post_vote_attack(self):
         self.myLogger.addToQueue("inside post_vote_attack")
+        self.myVoteManager.updateVote(self.ip, "Attack")
+        payload = {
+            "ip": self.ip,
+            "vote": "Attack"
+        }
+        self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
         return "OK"
     
     def post_vote_retreat(self):
         self.myLogger.addToQueue("inside post_vote_retreat")
+        self.myVoteManager.updateVote(self.ip, "Retreat")
+        payload = {
+            "ip": self.ip,
+            "vote": "Retreat"
+        }
+        self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
         return "OK"
 
     def post_vote_byzantine(self):
         self.myLogger.addToQueue("inside post_vote_byzantine")
         return "OK"
 
+    # post on ('/propagate')
+    def post_propagate(self):
+        data = list(request.body)
+        parsedItem = json.loads(data[0])
+        self.myVoteManager.updateVote(parsedItem['ip'], parsedItem['vote'])
                     
 
 
