@@ -48,8 +48,41 @@ class Server(Bottle):
 
     def observer(self):
         while True:
+            if self.myVoteManager.getAlgorithmState() == 2:
+                self.myVoteManager.setAlgorithmState(3)
+                self.myVoteManager.updateVoteMatrix(self.ip, self.myVoteManager.getVoteVector())
+                self.sendVoteVectors()
+                
+            elif self.myVoteManager.getAlgorithmState() == 4:
+                self.myVoteManager.setAlgorithmState(5)
+                print(self.myVoteManager.extractResult())
+            else:
+                pass
+
+            time.sleep(2)
+
+    
+
+    def sendVoteVectors(self):
+        if self.behavior == "Honest":
+            payLoad = {
+                "ip": self.ip,
+                "type": "Vector",
+                "data": self.myVoteManager.getVoteVector()
+            }
+            self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payLoad))
+        else: #"Byzantine"
+            payLoad = {
+                "ip": self.ip,
+                "type": "Vector",
+                "data": self.myVoteManager.getRandomVoteVector()
+            }
+            self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payLoad))
+
+
             
-            time.sleep(1)
+
+
     def contact_another_server(self, srv_ip, URI, req='POST', dataToSend=None):
         # Try to contact another serverthrough a POST or GET
         # usage: server.contact_another_server("10.1.1.1", "/index", "POST", params_dict)
@@ -78,11 +111,29 @@ class Server(Bottle):
         return template('lab4-html/vote_frontpage_template.html')
        
 
+    def vectorMatrixResult(self):
+        if self.myVoteManager.getAlgorithmState() >=4:
+            numberOfServers = len(self.servers_list)
+            header = "<br/><br/><h3> Showing voteVector Matrix</h3><br/>"
+            rows = ""
+            data = self.myVoteManager.getVoteMatrix()
+
+            for i in range(0, numberOfServers):
+                rows = rows + "vote Vector from "+self.servers_list[i]+" ==>"
+                rows = rows + str(data[i])
+                rows = rows + "<br/>"
+            
+            return header + "<br/>" + rows
+        else:
+            return ""
+
+
     # get on ('/get_vote_result')
     def get_vote_result(self):
         self.myLogger.addToQueue("Inside get result")
         #return template('lab4-html/vote_result_template.html')
-        return "Behavior: " + self.behavior + "<br/>" + str(self.myVoteManager.getVotes())
+        return "Behavior: " + self.behavior + "<br/>" + str(self.myVoteManager.getVoteVector()) + self.vectorMatrixResult()
+                                                      
 
     # get on ('/serverlist')
     def get_serverlist(self):
@@ -113,6 +164,7 @@ class Server(Bottle):
             self.myVoteManager.updateVote(self.ip, "Attack")
             payload = {
                 "ip": self.ip,
+                "type": "Single",
                 "vote": "Attack"
             }
             self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
@@ -128,6 +180,7 @@ class Server(Bottle):
             self.myVoteManager.updateVote(self.ip, "Retreat")
             payload = {
                 "ip": self.ip,
+                "type": "Single",
                 "vote": "Retreat"
             }
             self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
@@ -148,6 +201,7 @@ class Server(Bottle):
                 if srv_ip != self.ip: # don't propagate to yourself
                     payload = {
                         "ip": self.ip,
+                        "type": "Single",
                         "vote": random.choice(["Attack", "Retreat"])
                     }
                     self.executor.submit(self.contact_another_server, srv_ip, '/propagate', 'POST', json.dumps(payload))
@@ -160,7 +214,13 @@ class Server(Bottle):
     def post_propagate(self):
         data = list(request.body)
         parsedItem = json.loads(data[0])
-        self.myVoteManager.updateVote(parsedItem['ip'], parsedItem['vote'])
+        if parsedItem["type"] == "Single":
+            self.myVoteManager.updateVote(parsedItem['ip'], parsedItem['vote'])
+        elif parsedItem["type"] == "Vector":
+            self.myVoteManager.updateVoteMatrix(parsedItem['ip'], parsedItem['data'])
+        else:
+            print("Invalid Message type")
+        
                     
 
 
