@@ -19,6 +19,7 @@ class Server(Bottle):
         self.myLogger = mylogger.Logger(self.ip)
         self.myByzantine = Byzantine_Behavior()
         self.myVoteManager = VoteManager(self.servers_list)
+        self.behavior = "Unknown"
 
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
@@ -42,7 +43,13 @@ class Server(Bottle):
         self.get('/lab4-html/<filename:path>', callback=self.get_template)
         # You can have variables in the URI, here's an example
         # self.post('/board/<element_id:int>/', callback=self.post_board) where post_board takes an argument (integer) called element_id
+        thread = Thread(target=self.observer)
+        thread.start()
 
+    def observer(self):
+        while True:
+            
+            time.sleep(1)
     def contact_another_server(self, srv_ip, URI, req='POST', dataToSend=None):
         # Try to contact another serverthrough a POST or GET
         # usage: server.contact_another_server("10.1.1.1", "/index", "POST", params_dict)
@@ -75,7 +82,7 @@ class Server(Bottle):
     def get_vote_result(self):
         self.myLogger.addToQueue("Inside get result")
         #return template('lab4-html/vote_result_template.html')
-        return "Result Unknown"
+        return "Behavior: " + self.behavior + "<br/>" + str(self.myVoteManager.getVotes())
 
     # get on ('/serverlist')
     def get_serverlist(self):
@@ -96,29 +103,58 @@ class Server(Bottle):
             self.servers_list.remove(ipToRemove)
 
 
+    
+
     def post_vote_attack(self):
-        self.myLogger.addToQueue("inside post_vote_attack")
-        self.myVoteManager.updateVote(self.ip, "Attack")
-        payload = {
-            "ip": self.ip,
-            "vote": "Attack"
-        }
-        self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
-        return "OK"
+        if self.myVoteManager.isVoteAvailable(self.ip) == False:
+            self.behavior = "Honest"
+            self.myLogger.addToQueue("inside post_vote_attack")
+            self.myVoteManager.initialize()
+            self.myVoteManager.updateVote(self.ip, "Attack")
+            payload = {
+                "ip": self.ip,
+                "vote": "Attack"
+            }
+            self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
+            return "Voted ATTACK"
+        else:
+            return "Message: Algorithm is already initialized with server type " + self.behavior
     
     def post_vote_retreat(self):
-        self.myLogger.addToQueue("inside post_vote_retreat")
-        self.myVoteManager.updateVote(self.ip, "Retreat")
-        payload = {
-            "ip": self.ip,
-            "vote": "Retreat"
-        }
-        self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
-        return "OK"
+        if self.myVoteManager.isVoteAvailable(self.ip) == False:
+            self.behavior = "Honest"
+            self.myLogger.addToQueue("inside post_vote_retreat")
+            self.myVoteManager.initialize()
+            self.myVoteManager.updateVote(self.ip, "Retreat")
+            payload = {
+                "ip": self.ip,
+                "vote": "Retreat"
+            }
+            self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
+            return "Voted RETREAT"
+        else:
+            return "Message: Algorithm is already initialized with server type " + self.behavior
+
 
     def post_vote_byzantine(self):
-        self.myLogger.addToQueue("inside post_vote_byzantine")
-        return "OK"
+        if self.myVoteManager.isVoteAvailable(self.ip) == False:
+            self.behavior = "Byzantine"
+            self.myLogger.addToQueue("inside post_vote_byzantine")
+            self.myVoteManager.initialize()
+            self.myVoteManager.updateVote(self.ip, random.choice(["Attack", "Retreat"]))
+            
+
+            for srv_ip in self.servers_list:
+                if srv_ip != self.ip: # don't propagate to yourself
+                    payload = {
+                        "ip": self.ip,
+                        "vote": random.choice(["Attack", "Retreat"])
+                    }
+                    self.executor.submit(self.contact_another_server, srv_ip, '/propagate', 'POST', json.dumps(payload))
+            
+            return "Became Byzantine"
+        else:
+            return "Message: Algorithm is already initialized with server type " + self.behavior
 
     # post on ('/propagate')
     def post_propagate(self):
