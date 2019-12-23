@@ -72,12 +72,15 @@ class Server(Bottle):
             }
             self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payLoad))
         else: #"Byzantine"
-            payLoad = {
-                "ip": self.ip,
-                "type": "Vector",
-                "data": self.myVoteManager.getRandomVoteVector()
-            }
-            self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payLoad))
+            for srv_ip in self.servers_list:
+                if srv_ip != self.ip: # don't propagate to yourself
+                    payload = {
+                        "ip": self.ip,
+                        "type": "Vector",
+                        "data": self.myVoteManager.getRandomVoteVector()
+                    }
+                    self.executor.submit(self.contact_another_server, srv_ip, '/propagate', 'POST', json.dumps(payload))
+            
 
 
             
@@ -161,7 +164,7 @@ class Server(Bottle):
             self.behavior = "Honest"
             self.myLogger.addToQueue("inside post_vote_attack")
             self.myVoteManager.initialize()
-            self.myVoteManager.updateVote(self.ip, "Attack")
+            self.myVoteManager.updateVote(self.ip, u'Attack')
             payload = {
                 "ip": self.ip,
                 "type": "Single",
@@ -177,7 +180,7 @@ class Server(Bottle):
             self.behavior = "Honest"
             self.myLogger.addToQueue("inside post_vote_retreat")
             self.myVoteManager.initialize()
-            self.myVoteManager.updateVote(self.ip, "Retreat")
+            self.myVoteManager.updateVote(self.ip, u'Retreat')
             payload = {
                 "ip": self.ip,
                 "type": "Single",
@@ -194,7 +197,7 @@ class Server(Bottle):
             self.behavior = "Byzantine"
             self.myLogger.addToQueue("inside post_vote_byzantine")
             self.myVoteManager.initialize()
-            self.myVoteManager.updateVote(self.ip, random.choice(["Attack", "Retreat"]))
+            self.myVoteManager.updateVote(self.ip, random.choice([u'Attack', u'Retreat']))
             
 
             for srv_ip in self.servers_list:
@@ -202,7 +205,7 @@ class Server(Bottle):
                     payload = {
                         "ip": self.ip,
                         "type": "Single",
-                        "vote": random.choice(["Attack", "Retreat"])
+                        "vote": random.choice([u'Attack', u'Retreat'])
                     }
                     self.executor.submit(self.contact_another_server, srv_ip, '/propagate', 'POST', json.dumps(payload))
             

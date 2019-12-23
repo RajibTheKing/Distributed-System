@@ -79,7 +79,7 @@ class VoteManager:
     def getRandomVoteVector(self):
         randomVoteVector = []
         for i in range(0, self.numberOfServers):
-            randomVoteVector.append(random.choice(["Attack", "Retreat"]))
+            randomVoteVector.append(random.choice([u'Attack', u'Retreat']))
         return randomVoteVector
 
     
