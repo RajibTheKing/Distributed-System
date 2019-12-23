@@ -129,13 +129,53 @@ class Server(Bottle):
             return header + "<br/>" + rows
         else:
             return ""
+    
+    def extractResult(self):
+        if self.myVoteManager.getAlgorithmState() >= 4:
+            numberOfServers = len(self.servers_list)
+            header = "<br/><br/><h3> Extracting Result voteVector Matrix</h3><br/>"
+            rows = ""
+            data = self.myVoteManager.getVoteMatrix()
+            attacksCnt = 0
+            retreatCnt = 0
+            finalAttackCnt = 0
+            finalRetreatCnt = 0
+            for i in range(0, numberOfServers):
+                attacksCnt = 0
+                retreatCnt = 0
+                for j in range(0, numberOfServers):
+                    if i == j:
+                        rows = rows + "<del>" + data[i][j] + "</del>"
+                    else:
+                        rows = rows + data[i][j]
+                    
+                    if i != j:
+                        if data[i][j] == "Attack":
+                            attacksCnt = attacksCnt + 1
+                        else:
+                            retreatCnt = retreatCnt + 1
+                    
+                if attacksCnt > retreatCnt:
+                    finalAttackCnt = finalAttackCnt + 1
+                    rows = rows + " ==> " + "Attack"
+                else:
+                    finalRetreatCnt = finalRetreatCnt + 1
+                    rows = rows + " ==> " + "Retreat"
+                rows = rows + "<br/>"
+            if finalAttackCnt > finalRetreatCnt:
+                rows = rows + "<h4> Final Answer = Attack </h4> <br/>"
+            else:
+                rows = rows + "<h4> Final Answer = Retreat </h4> <br/>"
+            return header + "<br/>" + rows
+        else:
+            return ""
 
 
     # get on ('/get_vote_result')
     def get_vote_result(self):
         self.myLogger.addToQueue("Inside get result")
         #return template('lab4-html/vote_result_template.html')
-        return "Behavior: " + self.behavior + "<br/>" + str(self.myVoteManager.getVoteVector()) + self.vectorMatrixResult()
+        return "Behavior: " + self.behavior + "<br/>" + str(self.myVoteManager.getVoteVector()) + self.vectorMatrixResult() + self.extractResult()
                                                       
 
     # get on ('/serverlist')
