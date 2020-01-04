@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="./lab4-html/style.css">
+        <link rel="stylesheet" type="text/css" href="./lab4-html/buttonStyle.css">
+    </head>
+
+    <body>
+        <div id="countdown_placeholder"></div>
+        <div id="boardcontents_status_placeholder">0: success</div>
+        <iframe name="noreload-form-target" width="90%" height="50" src="about:blank" frameborder="0" scrolling="yes" resizable seamless></iframe>
+
+        <div id="vote_form_placeholder">
+        <h3>Vote</h3>
+        <form id="usrform" target="noreload-form-target">
+            <input class="btn-two green rounded" type="submit" formmethod="post" formaction="/vote/attack" value="Attack" />
+            <input class="btn-two green rounded" type="submit" formmethod="post" formaction="/vote/retreat" value="Retreat" />
+            <input class="btn-two red rounded" type="submit" formmethod="post" formaction="/vote/byzantine" value="Byzantine" />
+        </form>
+        </div>
+
+        <h3>Result</h3>
+        <button class="btn-two yellow rounded" onClick="window.location.reload(true);">Refresh Page</button>
+            
+        <table class="tablecontainer">
+            <thead>
+                <tr>
+                    <th><h1>Vote Table</h1></th>
+                    % serverID = 1
+                    % for results in dataVector:
+                        <th><h1>10.1.0.{{serverID}}</h1></th>
+                        % serverID = serverID + 1
+                    % end 
+                    
+                </tr>
+            </thead>
+            <tbody>
+                % serverID = 1
+                % for results in dataVector:
+                    <tr>
+                        <th>From: 10.1.0.{{serverID}}</th>
+                        % serverID = serverID + 1
+                        % for vote in results:
+                            <td>{{vote}}</td>
+                        % end
+                    </tr>
+                % end
+            </tbody>
+        </table>
+
+    </body>
+
+
+</html>

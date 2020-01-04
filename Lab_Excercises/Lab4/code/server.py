@@ -1,4 +1,6 @@
 # coding=utf-8
+# 7d03b7aaa0daa7a47b3748e174700be23730d09d
+
 from allimports import *
 
 # User defined modules
@@ -111,7 +113,7 @@ class Server(Bottle):
 
     def index(self):
         self.myLogger.addToQueue("Inside index")
-        return template('lab4-html/vote_frontpage_template.html')
+        return template('lab4-html/index.html', dataVector=self.myVoteManager.getVoteMatrix())
        
 
     def vectorMatrixResult(self):

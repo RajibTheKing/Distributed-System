@@ -65,11 +65,36 @@ An error shown here means the server is not responding -->
     </div>
 
     <h3>Result</h3>
-    <button onclick="update_contents();">Refresh Vote Result</button>
+    <button onClick="window.location.reload(true);">Refresh Page</button>
 
-    <div id="vote_result_placeholder">
-    <pre>Voting Results ...</pre>
-    </div>
+
+    <table style="width:100%" border="1">
+      % serverID = 1
+      <tr>
+        <th></th>
+        % for results in dataVector:
+          <th bgcolor="grey">
+              10.1.0.{{serverID}}
+          </th>
+          % serverID = serverID + 1
+        % end  
+      </tr>
+      % serverID = 1
+      % for results in dataVector:
+        <tr>
+          <th bgcolor="grey">Data From: 10.1.0.{{serverID}}</th>
+          % serverID = serverID + 1
+          
+        % for vote in results:
+          <td align="center">
+              {{vote}}
+          </td>
+        % end
+        </tr>
+      % end
+    </table>
+
+    
 
   </body>
 </html>
