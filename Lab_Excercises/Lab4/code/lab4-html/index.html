@@ -7,16 +7,17 @@
 
     <body>
         <div id="countdown_placeholder"></div>
-        <div id="boardcontents_status_placeholder">0: success</div>
-        <iframe name="noreload-form-target" width="90%" height="50" src="about:blank" frameborder="0" scrolling="yes" resizable seamless></iframe>
+        <iframe name="noreload-form-target" width="90%" height="50" src="about:blank" frameborder="0" scrolling="yes" resizable seamless>
 
-        <div id="vote_form_placeholder">
-        <h3>Vote</h3>
-        <form id="usrform" target="noreload-form-target">
-            <input class="btn-two green rounded" type="submit" formmethod="post" formaction="/vote/attack" value="Attack" />
-            <input class="btn-two green rounded" type="submit" formmethod="post" formaction="/vote/retreat" value="Retreat" />
-            <input class="btn-two red rounded" type="submit" formmethod="post" formaction="/vote/byzantine" value="Byzantine" />
-        </form>
+        </iframe>
+
+        <div class="vote_form_placeholder">
+            <h3>Vote</h3>
+            <form id="usrform" target="noreload-form-target">
+                <input class="btn-two green rounded" type="submit" formmethod="post" formaction="/vote/attack"    value="Attack" />
+                <input class="btn-two green rounded" type="submit" formmethod="post" formaction="/vote/retreat"   value="Retreat" />
+                <input class="btn-two red rounded"   type="submit" formmethod="post" formaction="/vote/byzantine" value="Byzantine" />
+            </form>
         </div>
 
         <h3>Result</h3>

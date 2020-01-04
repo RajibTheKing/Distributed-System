@@ -126,7 +126,7 @@ button[class*="btn"] {border: 0;}
 	padding: 15px 25px;
 	display: inline-block;
 	text-align: center;
-	color: white;
+	color: black;
 }
 .btn:active {
 	top: 4px;	
@@ -153,7 +153,7 @@ button[class*="btn"] {border: 0;}
 
 /* Button two - I have no creativity for names */
 .btn-two {
-	color: white;	
+	color: black;	
 	padding: 15px 25px;
 	display: inline-block;
 	border: 1px solid rgba(0,0,0,0.21);

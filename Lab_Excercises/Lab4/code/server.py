@@ -213,9 +213,9 @@ class Server(Bottle):
                 "vote": "Attack"
             }
             self.propagate_to_all_servers('/propagate', 'POST', dataToSend=json.dumps(payload))
-            return "Voted ATTACK"
+            return 'Voted ATTACK'
         else:
-            return "Message: Algorithm is already initialized with server type " + self.behavior
+            return 'Message: Algorithm is already initialized with server type ' + self.behavior
     
     def post_vote_retreat(self):
         if self.myVoteManager.isVoteAvailable(self.ip) == False:
