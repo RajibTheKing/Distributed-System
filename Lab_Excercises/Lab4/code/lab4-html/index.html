@@ -37,18 +37,58 @@
             </thead>
             <tbody>
                 % serverID = 1
+                % i = 0
+                
                 % for results in dataVector:
                     <tr>
                         <th>From: 10.1.0.{{serverID}}</th>
                         % serverID = serverID + 1
+                        % j = 0
                         % for vote in results:
-                            <td>{{vote}}</td>
+                            % if i == j:
+                                <td bgcolor="#fa5a5a">{{vote}}</td>
+                            % else:
+                                <td>{{vote}}</td>
+                            % end
+                            % j = j + 1
                         % end
                     </tr>
+                    % i = i + 1
                 % end
             </tbody>
         </table>
 
+        <table class="tablecontainer">
+            <thead>
+                <tr>
+                    <th><h1>Result Table</h1></th>
+                    % serverID = 1
+                    % for results in dataVector:
+                        <th><h1>10.1.0.{{serverID}}</h1></th>
+                        % serverID = serverID + 1
+                    % end 
+                    
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <th>Result Vector</th>
+                    % for result in resultVector:
+                    <td>{{result}}</td>
+                    % end 
+                </tr>
+            </tbody>
+        </table>
+        
+        <table class="tablecontainer result">
+            <tbody>
+                <tr>
+                    <th>Final Result</th>
+                    <td>  {{finalResult}}  </td>
+                </tr>
+            </tbody>
+        </table>
+        
     </body>
 
 
