@@ -48,17 +48,36 @@ class Server(Bottle):
         thread.start()
 
     def observer(self):
+        n = len(self.servers_list)
+        md = (n - 1) % 3
+        k = int(((n - 1) - md) / 3) 
+
+
+
         while True:
+            
             if self.myVoteManager.getAlgorithmState() == 2:
                 self.myVoteManager.setAlgorithmState(3)
                 self.myVoteManager.updateVoteMatrix(self.ip, self.myVoteManager.getVoteVector())
                 self.sendVoteVectors()
                 
             elif self.myVoteManager.getAlgorithmState() == 4:
-                self.myVoteManager.setAlgorithmState(5)
-                print(self.myVoteManager.extractResult())
+                if k <= 1:
+                    self.myVoteManager.setAlgorithmState(5)
+                else:
+                    # if we have more than one byzentin general  than we need  to go k + 1 round
+                    (vect, res) = self.myVoteManager.calculateResult()
+                    self.myVoteManager.start_nextRound()
+                    k = k - 1
+                    time.sleep(2)
+
+                    self.myVoteManager.updateVoteMatrix(self.ip, vect)
+                    self.sendVoteVectors()
+                
             else:
                 pass
+
+            print("=======> kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk, state", k, self.myVoteManager.getAlgorithmState())
 
             time.sleep(2)
 
@@ -78,7 +97,7 @@ class Server(Bottle):
                     payload = {
                         "ip": self.ip,
                         "type": "Vector",
-                        "data": self.myVoteManager.getRandomVoteVector()
+                        "data": self.myVoteManager.getRandomVoteVector(self.ip,srv_ip)
                     }
                     self.executor.submit(self.contact_another_server, srv_ip, '/propagate', 'POST', json.dumps(payload))
             
@@ -112,46 +131,11 @@ class Server(Bottle):
 
     def index(self):
         self.myLogger.addToQueue("Inside index")
-        (vect, res) = self.calculateResult()
+        (vect, res) = self.myVoteManager.calculateResult()
         return template('lab4-html/index.html', dataVector=self.myVoteManager.getVoteMatrix(), resultVector=vect, finalResult=res)
        
     
-    def calculateResult(self):
-        if self.myVoteManager.getAlgorithmState() >= 4:
-            numberOfServers = len(self.servers_list)
-            data = self.myVoteManager.getVoteMatrix()
-            attacksCnt = [0] * numberOfServers
-            retreatCnt = [0] * numberOfServers
-            finalAttackCnt = 0
-            finalRetreatCnt = 0
-            resultVector = []
-            for i in range(0, numberOfServers):
-                for j in range(0, numberOfServers):
-                    if i != j:
-                        if data[i][j] == "Attack":
-                            attacksCnt[j] = attacksCnt[j] + 1
-                        else:
-                            retreatCnt[j] = retreatCnt[j] + 1
-                    
-            for i in range(0, numberOfServers):
-                if attacksCnt[i] > retreatCnt[i]:
-                    resultVector.append("Attack")
-                else:
-                    resultVector.append("Retreat")
-            
-            for i in range(0, numberOfServers):
-                if resultVector[i] == "Attack":
-                    finalAttackCnt  = finalAttackCnt + 1
-                else:
-                    finalRetreatCnt = finalRetreatCnt + 1
-            
-            if finalAttackCnt > finalRetreatCnt:
-                return (resultVector, "Attack")
-            else:
-                return (resultVector, "Retreat")
-
-        else:
-            return ([], "Unknown")                                                  
+                                                     
 
     # get on ('/serverlist')
     def get_serverlist(self):
@@ -217,11 +201,13 @@ class Server(Bottle):
 
             for srv_ip in self.servers_list:
                 if srv_ip != self.ip: # don't propagate to yourself
+                    vote = random.choice([u'Attack', u'Retreat'])
                     payload = {
                         "ip": self.ip,
                         "type": "Single",
-                        "vote": random.choice([u'Attack', u'Retreat'])
+                        "vote": vote
                     }
+                    self.myVoteManager.setByzsent(srv_ip,vote)
                     self.executor.submit(self.contact_another_server, srv_ip, '/propagate', 'POST', json.dumps(payload))
             
             return "Became Byzantine"
